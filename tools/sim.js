@@ -1,11 +1,12 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const src = fs.readFileSync('/mnt/user-data/outputs/dusk-town.html', 'utf8');
+const src = fs.readFileSync('/home/claude/work/dusk-town.html', 'utf8');
 const script = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
 function fakeEl(){
   const el = {
+    dataset: {},
     innerHTML:'', textContent:'', title:'', type:'', className:'', disabled:false, open:false,
     style:{ cssText:'' },
     classList:{ add(){}, remove(){}, toggle(){} },
@@ -57,7 +58,6 @@ function takeTurn(P){
 function playOne(seedLabel){
   ctx.newGame();
   const S = ctx.S;
-  S.you.goals = ctx.GOALS.slice(0,2);
 
   let turns = 0, idle = 0;
   while(turns < 500){
@@ -82,7 +82,7 @@ function playOne(seedLabel){
 }
 
 const runs = [];
-for(let i=0;i<20;i++) runs.push(playOne('g'+(i+1)));
+for(let i=0;i<8;i++) runs.push(playOne('g'+(i+1)));
 
 console.log('label turns | yTiles yHouse yTotal yHand | bTiles bHouse bTotal bHand | deckL');
 for(const r of runs){

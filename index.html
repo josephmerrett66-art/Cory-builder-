@@ -307,19 +307,21 @@ function quadrant(g,qx,qy,size){
 /* ===================== open land ===================== */
 function grassSprite(v){
   var g=blank(), R=rnd(v*97+13);
-  speckle(g,v*31+5,54+Math.floor(R()*24));
+  /* keep this sparse: each stray speckle splits a row into more SVG rects,
+     and there are 169 of these on the board */
+  speckle(g,v*31+5,10+Math.floor(R()*8));
   var shrubs=1+Math.floor(R()*3), i;
   for(i=0;i<shrubs;i++){
     var sx=2+Math.floor(R()*28), sy=2+Math.floor(R()*28), sr=1+Math.floor(R()*2);
     blob(g,sx,sy,sr+1,sr,"F");
     px(g,sx-1,sy-1,"H"); px(g,sx+1,sy,"H");
   }
-  var blooms=2+Math.floor(R()*5);
+  var blooms=2+Math.floor(R()*3);
   for(i=0;i<blooms;i++){
     var fx=1+Math.floor(R()*30), fy=1+Math.floor(R()*30);
     if(g[fy][fx]==="g"||g[fy][fx]==="G"||g[fy][fx]==="h"){ g[fy][fx]=R()>.5?"p":"P"; }
   }
-  var tufts=3+Math.floor(R()*4);
+  var tufts=2+Math.floor(R()*2);
   for(i=0;i<tufts;i++){
     var tx=1+Math.floor(R()*30), ty=1+Math.floor(R()*30);
     if(g[ty][tx]==="g"){ g[ty][tx]="H"; if(tx+1<32&&g[ty][tx+1]==="g") g[ty][tx+1]="G"; }
@@ -947,6 +949,7 @@ function newGame(){
   };
   grid[YOU_GATE.r][YOU_GATE.c]={type:"entrance",mask:YOU_GATE.mask,v:0,order:0,owner:"you"};
   grid[BOT_GATE.r][BOT_GATE.c]={type:"entrance",mask:BOT_GATE.mask,v:0,order:0,owner:"bot"};
+  cellEls=null;
   refill();
   render();
 }
@@ -1169,38 +1172,60 @@ function finish(){
 }
 
 /* ===================== render ===================== */
-function render(prefix){
-  var P=S.you;
+/* The board holds ~30k SVG rects. Rebuilding it every render churned enough
+   memory to crash the tab on mobile, so the cells are created once and each
+   one is only repainted when its contents actually change. */
+var cellEls=null;
+function ensureBoard(){
+  if(cellEls) return;
   var board=document.getElementById("board");
   board.innerHTML="";
-  var item=(S.selected!==null&&canPlace())?P.hand[S.selected]:null;
-
+  cellEls=[];
   for(var r=0;r<SIZE;r++){
     for(var c=0;c<SIZE;c++){
       (function(r,c){
-        var q=S.grid[r][c];
         var b=document.createElement("button");
-        b.type="button"; b.className="cell";
-        var legal=item?legalFor(item,r,c,"you"):false;
-        if(!q){ b.classList.add("empty"); b.innerHTML=sprite("grass",0,S.land[r][c]); }
-        if(legal) b.classList.add("legal");
-        if(q) b.classList.add(q.owner==="you"?"own-you":"own-bot");
-        if(S.fresh&&S.fresh.r===r&&S.fresh.c===c) b.classList.add("fresh");
-        if(S.inspect&&S.inspect.r===r&&S.inspect.c===c) b.classList.add("inspect");
-        if(q){
-          b.innerHTML=sprite(q.type,q.mask,q.v);
-          b.setAttribute("aria-label",(q.owner==="you"?"Your ":"Ada's ")+NAMES[q.type]+" row "+(r+1)+" column "+(c+1));
-        } else {
-          b.setAttribute("aria-label",(legal?"Buildable plot ":"Empty plot ")+"row "+(r+1)+" column "+(c+1));
-        }
+        b.type="button"; b.className="cell"; b.dataset.sig="";
         b.addEventListener("click",function(){
+          var item=(S.selected!==null&&canPlace())?S.you.hand[S.selected]:null;
           if(item&&legalFor(item,r,c,"you")){ place(r,c); }
-          else { S.inspect=q?{r:r,c:c}:null; render(); }
+          else { S.inspect=S.grid[r][c]?{r:r,c:c}:null; render(); }
         });
+        cellEls.push(b);
         board.appendChild(b);
       })(r,c);
     }
   }
+}
+function paintBoard(){
+  var item=(S.selected!==null&&canPlace())?S.you.hand[S.selected]:null;
+  var i=0;
+  for(var r=0;r<SIZE;r++){
+    for(var c=0;c<SIZE;c++,i++){
+      var b=cellEls[i], q=S.grid[r][c];
+      var sig = q ? q.type+":"+q.mask+":"+q.v+":"+q.owner : "grass:"+S.land[r][c];
+      if(b.dataset.sig!==sig){
+        b.innerHTML = q ? sprite(q.type,q.mask,q.v) : sprite("grass",0,S.land[r][c]);
+        b.dataset.sig=sig;
+        b.setAttribute("aria-label", q
+          ? (q.owner==="you"?"Your ":"Ada's ")+NAMES[q.type]+" row "+(r+1)+" column "+(c+1)
+          : "Empty plot row "+(r+1)+" column "+(c+1));
+      }
+      var legal=item?legalFor(item,r,c,"you"):false;
+      b.classList.toggle("empty",!q);
+      b.classList.toggle("legal",legal);
+      b.classList.toggle("own-you",!!q&&q.owner==="you");
+      b.classList.toggle("own-bot",!!q&&q.owner==="bot");
+      b.classList.toggle("fresh",!!(S.fresh&&S.fresh.r===r&&S.fresh.c===c));
+      b.classList.toggle("inspect",!!(S.inspect&&S.inspect.r===r&&S.inspect.c===c));
+    }
+  }
+}
+function render(prefix){
+  var P=S.you;
+  var item=(S.selected!==null&&canPlace())?P.hand[S.selected]:null;
+  ensureBoard();
+  paintBoard();
 
   var mk=document.getElementById("market");
   mk.innerHTML="";
