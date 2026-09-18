@@ -13,7 +13,7 @@ and yours nothing for her. What you are competing for is space.
 **Only houses score, and only your own.** Everything else exists to make houses
 worth more. Your total is simply the sum of your houses.
 
-A house starts at 1 point and collects:
+A home starts at **0** and collects:
 
 | | |
 |---|---|
@@ -26,11 +26,12 @@ A house starts at 1 point and collects:
 | −3 | industry within 2 |
 | −3 | hospital within 1 |
 
-Floors at 0, tops out at 16. Distances are Chebyshev — diagonals count the same
+Floors at 0, tops out at 15 — and a home with no amenity and no job is worth
+nothing at all. Distances are Chebyshev — diagonals count the same
 as straight neighbours, so "within 2" is a 5×5 block.
 
-Each house holds 2 citizens; each factory has 4 jobs, so one factory covers two
-houses.
+A house holds 2 citizens and an apartment 4; each factory has 6 jobs, so one
+factory covers three houses. Distance is irrelevant — people commute.
 
 **Apartment blocks** hold four citizens and need four jobs. They score double
 whatever a house would score on that tile — but nothing at all unless a park

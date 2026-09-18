@@ -126,6 +126,9 @@
   .scoreline{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .scoreline span:first-child{color:var(--ink-soft);font-size:13px}
   .scoreline span:last-child{font-family:"Silkscreen",monospace;font-size:12px}
+  .scoreline.good span,.scoreline.warn span{color:inherit}
+  .scoreline.good{color:#7fce9c}
+  .scoreline.warn{color:#f08a72}
   button.act{
     font-family:"Silkscreen","Courier New",monospace;font-size:10px;
     background:var(--panel2);color:var(--ink);border:2px solid var(--edge);
@@ -1145,7 +1148,8 @@ function hasActiveSchool(r,c,own){
   return false;
 }
 function houseScore(r,c,own,employed){
-  var p=1, plus=[], minus=[];
+  /* base 0: a home with no amenities and no work earns nothing */
+  var p=0, plus=[], minus=[];
   if(near(r,c,2,"park",own)){ p+=2; plus.push("+2 park"); }
   if(near(r,c,2,"shop",own)){ p+=2; plus.push("+2 shop"); }
   if(employed){ p+=2; plus.push("+2 job"); }
@@ -1156,10 +1160,10 @@ function houseScore(r,c,own,employed){
   if(near(r,c,1,"hospital",own)){ p-=3; minus.push("\u22123 hospital within 1"); }
   return {points:Math.max(0,p),plus:plus,minus:minus};
 }
-/* each house holds 2 citizens; each factory you own has 4 jobs.
-   so one factory covers two houses, at any distance — people commute,
-   they just don't want to live next to it */
-var JOBS_PER_FACTORY=4;
+/* a house holds 2 citizens, an apartment 4; each factory has 6 jobs.
+   Distance is irrelevant: people commute, they just don't want to live
+   next to the place. */
+var JOBS_PER_FACTORY=6;
 function employedSet(own){
   var homes=[], citizens=0;
   each(function(r,c,q){
@@ -1613,10 +1617,10 @@ function render(prefix){
   vb.querySelector(".num").textContent=bs.total;
   vy.classList.toggle("behind",a.total<bs.total);
   vb.classList.toggle("behind",bs.total<a.total);
+  var enough=a.jobs>=a.citizens;
   var bd='<div class="scoreline"><span>Your homes ('+a.houses+')</span><span>'+a.housePts+'</span></div>'+
-         '<div class="scoreline"><span>Jobs for citizens</span><span>'+a.jobs+' / '+a.citizens+'</span></div>'+
-         '<div class="scoreline"><span>Homes with work</span><span>'+a.employed+' of '+a.houses+'</span></div>'+
-         '';
+         '<div class="scoreline '+(enough?'good':'warn')+'"><span>Jobs for people</span><span>'+
+           a.jobs+' / '+a.citizens+'</span></div>';
   document.getElementById("breakdown").innerHTML=bd;
 
   var msg=prefix||"";
@@ -1632,13 +1636,13 @@ function render(prefix){
       var empi=employedSet(iq.owner);
       var hs=homeScore(S.inspect.r,S.inspect.c,iq.owner,!!empi.set[S.inspect.r+","+S.inspect.c]);
       msg="<b>"+NAMES[iq.type]+" ("+whose+") \u2014 "+hs.points+"</b><br>"+
-          ["1 base"].concat(hs.plus,hs.minus).join(" \u00b7 ");
+          ["0 base"].concat(hs.plus,hs.minus).join(" \u00b7 ");
     } else if(isRoad(iq.type)){
       msg="<b>"+NAMES[iq.type]+" ("+whose+", "+(SHAPE_NAME[iq.mask]||"junction")+")</b><br>"+
           (mine?"Your road. Buildings may touch it.":"Ada's road. You cannot build off it.");
     } else if(iq.type==="industrial"){
       msg="<b>Industrial ("+whose+")</b><br>"+
-          (mine?"4 jobs, any distance. \u22123 to your houses within 2."
+          (mine?"6 jobs, any distance. \u22123 to your houses within 2."
                :"Ada's. No effect on your houses.");
     } else if(iq.type==="sports"){
       msg="<b>Sports centre ("+whose+")</b><br>"+
@@ -1678,7 +1682,7 @@ function render(prefix){
 /* ===================== legend ===================== */
 (function(){
   var rows=[
-    ["house",0,0,"House","<b>1</b> base, then:<br>"+
+    ["house",0,0,"House","2 citizens. Starts at <b>0</b>, then:<br>"+
       "<b>+2</b> park within 2<br>"+
       "<b>+2</b> shop within 2<br>"+
       "<b>+2</b> has a job<br>"+
@@ -1688,12 +1692,13 @@ function render(prefix){
       "<b>\u22123</b> industry within 2<br>"+
       "<b>\u22123</b> hospital within 1<br>"+
       "Never below 0."],
-    ["apartment",0,0,"Apartment block","Four citizens, so it needs 4 jobs.<br>"+
+    ["apartment",0,0,"Apartment block","4 citizens, so it needs 4 jobs.<br>"+
       "Scores <b>double</b> whatever a house on that tile would score.<br>"+
       "<b>0</b> unless a park <i>and</i> a shop are directly next to it."],
     ["park",0,0,"Park","<b>+2</b> to each of your houses within 2."],
     ["shop",0,0,"Shop","<b>+2</b> to each of your houses within 2."],
-    ["industrial",0,0,"Industrial","4 jobs. Each house holds 2 citizens and needs 2 jobs.<br>"+
+    ["industrial",0,0,"Industrial","<b>6 jobs</b>, at any distance.<br>"+
+      "A house needs 2, an apartment 4 \u2014 one factory covers three houses.<br>"+
       "<b>\u22123</b> to each of your houses within 2."],
     ["sports",0,0,"Sports centre","<b>+3</b> to each of your houses within 3.<br>Occupies 2\u00d72. One per player."],
     ["school",0,0,"School","<b>+3</b> to each of your houses within 2.<br>Gives nothing if any industry is within 2 of it. One per player."],
