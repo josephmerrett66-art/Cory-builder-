@@ -10,7 +10,8 @@ Two towns grow on one 13×13 plot of land. You enter from the south edge, Ada fr
 the north. Your roads, parks and plants are yours alone: hers do nothing for you,
 and yours nothing for her. What you are competing for is space.
 
-**Only houses score.** Everything else exists to make houses worth more.
+**Only houses score, and only your own.** Everything else exists to make houses
+worth more. Your total is simply the sum of your houses.
 
 A house starts at 1 point and collects:
 
@@ -40,11 +41,6 @@ and you may only ever own one of each.
 Roads are Carcassonne-style: straights, corners, T-junctions and crossroads that
 must match end to end where two of your roads meet. Buildings go anywhere along
 your own road. The game ends when the deck runs dry and neither player can place.
-
-## Bonus goals
-
-Three are dealt at the start and you discard one. They score if met, and cost
-nothing if missed.
 
 ## Tools
 

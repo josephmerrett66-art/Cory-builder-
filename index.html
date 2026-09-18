@@ -119,10 +119,6 @@
   .scoreline{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .scoreline span:first-child{color:var(--ink-soft);font-size:13px}
   .scoreline span:last-child{font-family:"Silkscreen",monospace;font-size:12px}
-  .goal{display:flex;gap:9px;align-items:flex-start;font-size:13px;margin-bottom:8px}
-  .goal .mark{font-family:"Silkscreen",monospace;font-size:12px;flex:0 0 auto;margin-top:1px}
-  .goal b{color:var(--ink)}
-  .goal .pts{margin-left:auto;font-family:"Silkscreen",monospace;font-size:11px;color:var(--gold)}
   button.act{
     font-family:"Silkscreen","Courier New",monospace;font-size:10px;
     background:var(--panel2);color:var(--ink);border:2px solid var(--edge);
@@ -142,13 +138,6 @@
   }
   dialog::backdrop{background:rgba(20,18,40,.72)}
   dialog h2{font-family:"Silkscreen",monospace;font-size:15px;margin:0 0 12px}
-  .goalpick{
-    display:block;width:100%;text-align:left;margin-bottom:9px;
-    background:var(--panel2);color:var(--ink);border:3px solid var(--edge);
-    padding:10px 11px;cursor:pointer;font-size:13.5px;font-family:inherit;
-  }
-  .goalpick:hover{border-color:var(--bad)}
-  .goalpick b{display:block;font-family:"Silkscreen",monospace;font-size:11px;margin-bottom:3px}
   @media (max-width:880px){
     body{padding:10px 6px 30px}
     .wrap{max-width:100%}
@@ -193,10 +182,6 @@
 
     <div class="panel-col">
       <div class="card">
-        <h2>Your bonus goals</h2>
-        <div id="goals"></div>
-      </div>
-      <div class="card">
         <h2>Your score</h2>
         <div id="breakdown"></div>
       </div>
@@ -208,12 +193,6 @@
     </div>
   </div>
 </div>
-
-<dialog id="pick">
-  <h2>Keep two goals</h2>
-  <p style="font-size:13.5px;margin:0 0 14px;color:var(--ink-soft)">Three were dealt. Tap the one you want to throw away. Goals count your own tiles only.</p>
-  <div id="pickbody"></div>
-</dialog>
 
 <dialog id="over">
   <h2 id="overtitle">Final scores</h2>
@@ -893,63 +872,6 @@ function openEnds(own){
   return n;
 }
 
-/* ===================== goals (own tiles only) ===================== */
-var GOALS=[
-  {id:"greenbelt",name:"Green belt",pts:10,text:"Plant five or more parks of your own.",
-   check:function(o){ var n=countOwned(o,"park"); return {done:n>=5,prog:n+" / 5"}; }},
-  {id:"model",name:"Model home",pts:8,text:"A house of yours with a park and a shop within 2, and no industry within 2.",
-   check:function(o){
-     var found=0;
-     each(function(r,c,q){
-       if(!q||q.type!=="house"||q.owner!==o) return;
-       if(!near(r,c,2,"park",o)||!near(r,c,2,"shop",o)) return;
-       if(near(r,c,2,"industrial",o)) return;
-       found++;
-     });
-     return {done:found>=1,prog:found+" / 1"};
-   }},
-  {id:"highstreet",name:"High street",pts:10,text:"Three of your shops, each with three or more houses within 2.",
-   check:function(o){
-     var n=0;
-     each(function(r,c,q){
-       if(!q||q.type!=="shop"||q.owner!==o) return;
-       var hh=0;
-       for(var y=Math.max(0,r-2);y<=Math.min(SIZE-1,r+2);y++){
-         for(var x=Math.max(0,c-2);x<=Math.min(SIZE-1,c+2);x++){
-           var z=S.grid[y][x];
-           if(z&&z.type==="house"&&z.owner===o) hh++;
-         }
-       }
-       if(hh>=3) n++;
-     });
-     return {done:n>=3,prog:n+" / 3"};
-   }},
-  {id:"ringroad",name:"Ring road",pts:8,text:"Lay fourteen or more roads of your own.",
-   check:function(o){ var n=countOwned(o,"road"); return {done:n>=14,prog:n+" / 14"}; }},
-  {id:"cleanliving",name:"Clean living",pts:10,text:"Six of your houses with no industry of yours within 2.",
-   check:function(o){
-     var n=0;
-     each(function(r,c,q){
-       if(!q||q.type!=="house"||q.owner!==o) return;
-       if(near(r,c,2,"industrial",o)) return;
-       n++;
-     });
-     return {done:n>=6,prog:n+" / 6"};
-   }},
-  {id:"suburbia",name:"Suburbia",pts:8,text:"Build ten or more houses.",
-   check:function(o){ var n=countOwned(o,"house"); return {done:n>=10,prog:n+" / 10"}; }},
-  {id:"breathe",name:"Room to breathe",pts:10,text:"Three or more of your factories, none with a home, park or shop within 2.",
-   check:function(o){
-     var total=0, clean=0;
-     each(function(r,c,q){
-       if(!q||q.type!=="industrial"||q.owner!==o) return;
-       total++;
-       if(!near(r,c,2,"house",o)&&!near(r,c,2,"park",o)&&!near(r,c,2,"shop",o)) clean++;
-     });
-     return {done:total>=3&&clean===total,prog:clean+" / "+Math.max(3,total)};
-   }}
-];
-
 /* ===================== scoring ===================== */
 /* A house is scored against its own town only.
    employed = the town has factory capacity for it (see score) */
@@ -1000,21 +922,13 @@ function score(P){
       housePts+=houseScore(r,c,P.owner,!!emp.set[r+","+c]).points;
     }
   });
-  var goalPts=0, goalState=[];
-  (P.goals||[]).forEach(function(goal){
-    var res=goal.check(P.owner);
-    goalState.push({goal:goal,res:res});
-    if(res.done) goalPts+=goal.pts;
-  });
-  var unplaced=0, penalty=0;
-  return {houses:houses,housePts:housePts,goalPts:goalPts,goalState:goalState,
-          unplaced:unplaced,penalty:penalty,total:housePts+goalPts-penalty,
+  return {houses:houses,housePts:housePts,total:housePts,
           employed:emp.employed,jobs:emp.jobs,citizens:emp.citizens};
 }
 
 /* ===================== game state ===================== */
 function newPlayer(owner){
-  return {owner:owner, hand:[], goals:null, order:0, tookRoad:false};
+  return {owner:owner, hand:[], order:0, tookRoad:false};
 }
 function newGame(){
   var grid=[], land=[], r, c;
@@ -1029,15 +943,12 @@ function newGame(){
     you:newPlayer("you"), bot:newPlayer("bot"),
     deck:buildDeck(), market:[], roads:shuffle(roadStack()),
     turn:"you", mode:null, used:0,
-    selected:null, inspect:null, fresh:null, over:false,
-    dealt:shuffle(GOALS.slice()).slice(0,3)
+    selected:null, inspect:null, fresh:null, over:false
   };
   grid[YOU_GATE.r][YOU_GATE.c]={type:"entrance",mask:YOU_GATE.mask,v:0,order:0,owner:"you"};
   grid[BOT_GATE.r][BOT_GATE.c]={type:"entrance",mask:BOT_GATE.mask,v:0,order:0,owner:"bot"};
-  S.bot.goals=shuffle(GOALS.slice()).slice(0,2);
   refill();
   render();
-  askGoals();
 }
 function refill(){
   while(S.market.length<MARKET_SIZE&&S.deck.length){
@@ -1052,24 +963,6 @@ function hasCivic(P,type){
 function canTakeTile(P,type){
   return !isCivic(type) || !hasCivic(P,type);
 }
-function askGoals(){
-  var body=document.getElementById("pickbody");
-  body.innerHTML="";
-  S.dealt.forEach(function(goal,idx){
-    var b=document.createElement("button");
-    b.type="button"; b.className="goalpick";
-    b.innerHTML="<b>"+goal.name+" \u2014 "+goal.pts+" pts</b>"+goal.text;
-    b.addEventListener("click",function(){
-      S.you.goals=S.dealt.filter(function(_,i){ return i!==idx; });
-      document.getElementById("pick").close();
-      render();
-    });
-    body.appendChild(b);
-  });
-  var d=document.getElementById("pick");
-  if(typeof d.showModal==="function"&&!d.open) d.showModal();
-}
-
 /* ===================== your turn ===================== */
 function canTake(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="take"); }
 function canPlace(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="place"); }
@@ -1118,21 +1011,11 @@ function marketWant(P,type){
             countOwned(P.owner,"shop")+countOwned(P.owner,"industrial");
   var have=countOwned(P.owner,type)+P.hand.filter(function(i){return i.type===type;}).length;
   var share=total?have/(total+1):0;
-  var want=(targets[type]-share)*10;
-  (P.goals||[]).forEach(function(g){
-    if(g.check(P.owner).done) return;
-    if(g.id==="greenbelt"&&type==="park") want+=1.5;
-    if(g.id==="highstreet"&&type==="shop") want+=1.2;
-    if(g.id==="suburbia"&&type==="house") want+=1.2;
-    if(g.id==="breathe"&&type==="industrial") want+=1.0;
-    if(g.id==="cleanliving"&&type==="house") want+=0.8;
-    if(g.id==="model"&&(type==="park"||type==="shop")) want+=0.6;
-  });
-  return want;
+  return (targets[type]-share)*10;
 }
 function bestPlacement(P,forcePlants,strict){
   var b0=score(P);
-  var beforeCore=b0.housePts+b0.goalPts;
+  var beforeCore=b0.housePts;
   var best=null;
   var tilesLeft=S.deck.length+S.market.length;
   var stillPlaying=(tilesLeft>0||P.hand.length>1);
@@ -1155,7 +1038,7 @@ function bestPlacement(P,forcePlants,strict){
           var savedOrder=P.order;
           putTile(P,probe,masks[mi],r,c);
           var a1=score(P);
-          var gain=(a1.housePts+a1.goalPts)-beforeCore;
+          var gain=a1.housePts-beforeCore;
           var plots=openPlots(P.owner);
           var ends=openEnds(P.owner);
           clearTile(probe.type,r,c);
@@ -1272,9 +1155,6 @@ function finish(){
   function block(label,f){
     var h='<div class="scoreline"><span style="color:var(--ink)"><b>'+label+'</b></span><span>'+f.total+'</span></div>';
     h+='<div class="scoreline"><span>'+f.houses+' house'+(f.houses===1?'':'s')+'</span><span>'+f.housePts+'</span></div>';
-    f.goalState.forEach(function(gs){
-      h+='<div class="scoreline"><span>'+gs.goal.name+(gs.res.done?'':' (missed)')+'</span><span>'+(gs.res.done?gs.goal.pts:0)+'</span></div>';
-    });
     return h+'<div style="height:12px"></div>';
   }
   document.getElementById("overtitle").textContent =
@@ -1377,18 +1257,6 @@ function render(prefix){
     hd.appendChild(b);
   });
 
-  var gl=document.getElementById("goals");
-  if(!P.goals){
-    gl.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Choosing\u2026</div>';
-  } else {
-    gl.innerHTML=P.goals.map(function(goal){
-      var res=goal.check(P.owner);
-      return '<div class="goal"><span class="mark '+(res.done?'good':'')+'">'+(res.done?"\u2713":"\u00b7")+'</span>'+
-             '<span><b>'+goal.name+'</b> \u2014 '+goal.text+' <span style="opacity:.8">('+res.prog+')</span></span>'+
-             '<span class="pts">'+goal.pts+'</span></div>';
-    }).join("");
-  }
-
   var a=score(S.you), bs=score(S.bot);
   var vy=document.getElementById("vsyou"), vb=document.getElementById("vsbot");
   vy.querySelector(".num").textContent=a.total;
@@ -1398,7 +1266,7 @@ function render(prefix){
   var bd='<div class="scoreline"><span>Your houses ('+a.houses+')</span><span>'+a.housePts+'</span></div>'+
          '<div class="scoreline"><span>Jobs for citizens</span><span>'+a.jobs+' / '+a.citizens+'</span></div>'+
          '<div class="scoreline"><span>Houses with work</span><span>'+a.employed+' of '+a.houses+'</span></div>'+
-         '<div class="scoreline"><span>Your bonus goals</span><span>'+a.goalPts+'</span></div>';
+         '';
   document.getElementById("breakdown").innerHTML=bd;
 
   var msg=prefix||"";
@@ -1488,7 +1356,6 @@ document.getElementById("endturn").addEventListener("click",function(){
 document.getElementById("finish").addEventListener("click",finish);
 document.getElementById("restart").addEventListener("click",function(){
   var d=document.getElementById("over"); if(d.open) d.close();
-  var p=document.getElementById("pick"); if(p.open) p.close();
   newGame();
 });
 document.getElementById("viewmap").addEventListener("click",function(){
