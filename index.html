@@ -185,8 +185,7 @@
         <div class="rowlabel">Market</div>
         <div class="tilerow" id="market"></div>
         <div class="tilerow" id="roadrow" style="margin-top:7px"></div>
-        <div class="rowlabel">Civic building &mdash; costs your whole turn</div>
-        <div class="tilerow" id="civicrow"></div>
+
         <div class="rowlabel">Your hand</div>
         <div class="tilerow" id="hand"></div>
       </div>
@@ -204,7 +203,7 @@
       <div class="card">
         <h2>How a house scores</h2>
         <div class="legend" id="legend"></div>
-        <p style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0">You enter from the south edge, Ada from the north. Your roads, parks and plants are yours alone — hers do nothing for you, and yours nothing for her. What you're competing for is space.</p>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 0">You enter from the south edge, Ada from the north. Your roads, parks and factories are yours alone — hers do nothing for you, and yours nothing for her. Schools, hospitals and sports centres are rare and surface in the deck when they surface.</p>
       </div>
     </div>
   </div>
@@ -695,7 +694,6 @@ var SHAPE_NAME={5:"straight",10:"straight",3:"corner",6:"corner",12:"corner",9:"
                 7:"T-junction",14:"T-junction",13:"T-junction",11:"T-junction",15:"crossroads"};
 var BANDS={house:[20,26],park:[10,15],shop:[10,15],industrial:[10,15]};
 var DECK_SIZE=64;
-var UNPLACED_PENALTY=10;
 var MARKET_SIZE=3;
 var GRASS_VARIANTS=12;
 function roadStack(){
@@ -721,7 +719,6 @@ function rotateMask(m){
   return out;
 }
 function isRoad(t){ return t==="road"||t==="entrance"; }
-function isPlant(t){ return t==="power"||t==="water"; }
 function shuffle(a){
   for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=a[i]; a[i]=a[j]; a[j]=t; }
   return a;
@@ -738,6 +735,8 @@ function buildDeck(){
     if(sum!==DECK_SIZE) continue;
     var deck=[];
     for(j=0;j<types.length;j++){ for(k=0;k<counts[types[j]];k++){ deck.push(types[j]); } }
+    /* the civics ride along in the same deck, so they surface when they surface */
+    civicStack().forEach(function(t){ deck.push(t); });
     return shuffle(deck);
   }
   var fb=[];
@@ -909,12 +908,6 @@ var GOALS=[
      });
      return {done:found>=1,prog:found+" / 1"};
    }},
-  {id:"utilities",name:"Utilities first",pts:8,text:"Both your plants down within your first ten tiles.",
-   check:function(o){
-     var ok=0;
-     each(function(r,c,q){ if(q&&isPlant(q.type)&&q.owner===o&&q.order<=10) ok++; });
-     return {done:ok===2,prog:ok+" / 2"};
-   }},
   {id:"highstreet",name:"High street",pts:10,text:"Three of your shops, each with three or more houses within 2.",
    check:function(o){
      var n=0;
@@ -933,13 +926,12 @@ var GOALS=[
    }},
   {id:"ringroad",name:"Ring road",pts:8,text:"Lay fourteen or more roads of your own.",
    check:function(o){ var n=countOwned(o,"road"); return {done:n>=14,prog:n+" / 14"}; }},
-  {id:"cleanliving",name:"Clean living",pts:10,text:"Six of your houses with no industry or plant of yours within 2.",
+  {id:"cleanliving",name:"Clean living",pts:10,text:"Six of your houses with no industry of yours within 2.",
    check:function(o){
      var n=0;
      each(function(r,c,q){
        if(!q||q.type!=="house"||q.owner!==o) return;
        if(near(r,c,2,"industrial",o)) return;
-       if(near(r,c,2,"power",o)||near(r,c,2,"water",o)) return;
        n++;
      });
      return {done:n>=6,prog:n+" / 6"};
@@ -976,14 +968,11 @@ function houseScore(r,c,own,employed){
   var p=1, plus=[], minus=[];
   if(near(r,c,2,"park",own)){ p+=2; plus.push("park nearby"); }
   if(near(r,c,2,"shop",own)){ p+=2; plus.push("shops nearby"); }
-  if(countOwned(own,"power")>0){ p+=2; plus.push("powered"); }
-  if(countOwned(own,"water")>0){ p+=2; plus.push("plumbed"); }
   if(employed){ p+=2; plus.push("work in town"); }
   if(near(r,c,3,"sports",own)){ p+=3; plus.push("+3 sports centre"); }
   if(hasActiveSchool(r,c,own)){ p+=3; plus.push("+3 school"); }
   if(near(r,c,4,"hospital",own)){ p+=3; plus.push("+3 hospital nearby"); }
   if(near(r,c,2,"industrial",own)){ p-=3; minus.push("industry too close"); }
-  if(near(r,c,1,"power",own)||near(r,c,1,"water",own)){ p-=2; minus.push("plant next door"); }
   if(near(r,c,1,"hospital",own)){ p-=3; minus.push("hospital next door"); }
   return {points:Math.max(0,p),plus:plus,minus:minus};
 }
@@ -1017,9 +1006,7 @@ function score(P){
     goalState.push({goal:goal,res:res});
     if(res.done) goalPts+=goal.pts;
   });
-  var unplaced=0;
-  P.hand.forEach(function(it){ if(isPlant(it.type)) unplaced++; });
-  var penalty=unplaced*UNPLACED_PENALTY;
+  var unplaced=0, penalty=0;
   return {houses:houses,housePts:housePts,goalPts:goalPts,goalState:goalState,
           unplaced:unplaced,penalty:penalty,total:housePts+goalPts-penalty,
           employed:emp.employed,jobs:emp.jobs,citizens:emp.citizens};
@@ -1027,8 +1014,7 @@ function score(P){
 
 /* ===================== game state ===================== */
 function newPlayer(owner){
-  return {owner:owner, hand:[{type:"power",mask:0,v:0},{type:"water",mask:0,v:0}],
-          goals:null, order:0, tookRoad:false};
+  return {owner:owner, hand:[], goals:null, order:0, tookRoad:false};
 }
 function newGame(){
   var grid=[], land=[], r, c;
@@ -1042,7 +1028,6 @@ function newGame(){
     grid:grid, land:land,
     you:newPlayer("you"), bot:newPlayer("bot"),
     deck:buildDeck(), market:[], roads:shuffle(roadStack()),
-    civics:civicStack(), civic:null,
     turn:"you", mode:null, used:0,
     selected:null, inspect:null, fresh:null, over:false,
     dealt:shuffle(GOALS.slice()).slice(0,3)
@@ -1058,15 +1043,14 @@ function refill(){
   while(S.market.length<MARKET_SIZE&&S.deck.length){
     S.market.push({type:S.deck.pop(),mask:0,v:Math.floor(Math.random()*2)});
   }
-  if(!S.civic&&S.civics.length){ S.civic=S.civics.pop(); }
 }
 /* one of each civic per player, counting what's already in hand */
 function hasCivic(P,type){
   if(countOwned(P.owner,type)>0) return true;
   return P.hand.some(function(i){ return i.type===type; });
 }
-function canClaimCivic(P){
-  return !!S.civic && !hasCivic(P,S.civic);
+function canTakeTile(P,type){
+  return !isCivic(type) || !hasCivic(P,type);
 }
 function askGoals(){
   var body=document.getElementById("pickbody");
@@ -1089,15 +1073,6 @@ function askGoals(){
 /* ===================== your turn ===================== */
 function canTake(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="take"); }
 function canPlace(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="place"); }
-function canCivic(){ return !S.over&&S.turn==="you"&&S.used===0&&S.mode===null&&canClaimCivic(S.you); }
-
-function takeCivic(){
-  if(!canCivic()) return;
-  S.you.hand.push({type:S.civic,mask:0,v:0});
-  S.civic=null; refill();
-  S.mode="civic"; S.used=2; S.inspect=null;
-  endTurn();
-}
 function take(what){
   if(!canTake()) return;
   var P=S.you;
@@ -1106,7 +1081,8 @@ function take(what){
     P.hand.push({type:"road",mask:S.roads.pop(),v:0});
     P.tookRoad=true;
   } else {
-    if(!S.market[what]) return;
+    var t=S.market[what];
+    if(!t||!canTakeTile(P,t.type)) return;
     P.hand.push(S.market.splice(what,1)[0]);
     refill();
   }
@@ -1136,7 +1112,8 @@ function gameShouldEnd(){
 
 /* ===================== the bot ===================== */
 function marketWant(P,type){
-  var targets={house:0.42,park:0.19,shop:0.19,industrial:0.20};
+  var targets={house:0.42,park:0.19,shop:0.19,industrial:0.20,
+               sports:0.9,school:0.9,hospital:0.9};
   var total=countOwned(P.owner,"house")+countOwned(P.owner,"park")+
             countOwned(P.owner,"shop")+countOwned(P.owner,"industrial");
   var have=countOwned(P.owner,type)+P.hand.filter(function(i){return i.type===type;}).length;
@@ -1155,7 +1132,7 @@ function marketWant(P,type){
 }
 function bestPlacement(P,forcePlants,strict){
   var b0=score(P);
-  var beforeCore=b0.housePts+b0.goalPts;   // ignore the plant penalty here
+  var beforeCore=b0.housePts+b0.goalPts;
   var best=null;
   var tilesLeft=S.deck.length+S.market.length;
   var stillPlaying=(tilesLeft>0||P.hand.length>1);
@@ -1163,7 +1140,6 @@ function bestPlacement(P,forcePlants,strict){
   var home=homeRow(P.owner);
   for(var h=0;h<P.hand.length;h++){
     var item=P.hand[h];
-    if(forcePlants&&!isPlant(item.type)) continue;
     var masks=[item.mask];
     if(item.type==="road"){
       masks=[]; var m=item.mask;
@@ -1212,13 +1188,15 @@ function choosePlacement(P,forcePlants){
   return bestPlacement(P,forcePlants,true) || bestPlacement(P,forcePlants,false);
 }
 function botAct(P){
-  if(S.mode==="civic") return false;
   var tilesLeft=S.deck.length+S.market.length;
-  var holdsPlant=P.hand.some(function(i){ return isPlant(i.type); });
-  /* leave the plants till the town has shape, but never leave them unbuilt */
-  var forcePlants=holdsPlant&&tilesLeft<=6;
-  var best=choosePlacement(P,forcePlants);
-  if(forcePlants&&!best) best=choosePlacement(P,false);
+  var forcePlants=false;
+  var safe=bestPlacement(P,forcePlants,true);
+  if(forcePlants&&!safe) safe=bestPlacement(P,false,true);
+  var best=safe||bestPlacement(P,forcePlants,false)||bestPlacement(P,false,false);
+  /* every placement available would strangle the network: better to spend the
+     turn drawing a road shape that fits than to brick the town */
+  var compromised=!safe&&!!best;
+  var canDraw=S.market.length>0||S.roads.length>0;
 
   var plots=openPlots(P.owner);
   var ends=openEnds(P.owner);
@@ -1226,19 +1204,11 @@ function botAct(P){
   /* no road in hand and nowhere left to build: go and get a road */
   var starving=(plots<=2||ends<=1)&&roadsInHand===0&&S.roads.length>0;
 
-  /* a civic costs the whole turn, so only when the town can host it */
-  if(S.mode===null&&!forcePlants&&!starving&&canClaimCivic(P)&&
-     P.hand.length<=2&&countOwned(P.owner,"road")>=5&&ends>=2&&
-     (S.civic!=="sports"||plots>=6)&&tilesLeft>6){
-    P.hand.push({type:S.civic,mask:0,v:0});
-    S.civic=null; refill();
-    S.mode="civic";
-    return true;
-  }
-
   var wantPlace=best&&(forcePlants||P.hand.length>=4||best.gain>=1||!S.market.length);
   if(starving&&!forcePlants&&S.mode===null) wantPlace=false;
-  if(S.mode==="place") wantPlace=!!best;
+  /* wait for a road that fits, but not forever — hoarding is its own failure */
+  if(compromised&&canDraw&&!forcePlants&&S.mode===null&&P.hand.length<8) wantPlace=false;
+  if(S.mode==="place") wantPlace=!!best&&(!compromised||!canDraw||P.hand.length>=8);
   if(S.mode==="take") wantPlace=false;
 
   if(wantPlace&&(S.mode===null||S.mode==="place")){
@@ -1250,7 +1220,7 @@ function botAct(P){
     return true;
   }
   if(S.mode===null||S.mode==="take"){
-    if(!P.tookRoad&&S.roads.length&&(plots<8||ends<3||roadsInHand===0||Math.random()<0.4)){
+    if(!P.tookRoad&&S.roads.length&&(compromised||plots<8||ends<3||roadsInHand===0||Math.random()<0.4)){
       P.hand.push({type:"road",mask:S.roads.pop(),v:0});
       P.tookRoad=true; S.mode="take";
       return true;
@@ -1258,9 +1228,11 @@ function botAct(P){
     if(S.market.length){
       var bi=0, bv=-99;
       S.market.forEach(function(it,i){
+        if(!canTakeTile(P,it.type)) return;
         var w=marketWant(P,it.type);
         if(w>bv){ bv=w; bi=i; }
       });
+      if(bv<=-99) return false;
       P.hand.push(S.market.splice(bi,1)[0]);
       refill(); S.mode="take";
       return true;
@@ -1303,9 +1275,6 @@ function finish(){
     f.goalState.forEach(function(gs){
       h+='<div class="scoreline"><span>'+gs.goal.name+(gs.res.done?'':' (missed)')+'</span><span>'+(gs.res.done?gs.goal.pts:0)+'</span></div>';
     });
-    if(f.penalty){
-      h+='<div class="scoreline warn"><span>'+f.unplaced+' plant'+(f.unplaced===1?'':'s')+' never built</span><span>\u2212'+f.penalty+'</span></div>';
-    }
     return h+'<div style="height:12px"></div>';
   }
   document.getElementById("overtitle").textContent =
@@ -1313,7 +1282,7 @@ function finish(){
   var avg=a.houses?(a.housePts/a.houses):0;
   document.getElementById("overbody").innerHTML =
     block("You",a)+block("Ada",b)+
-    '<p style="font-size:13px;color:var(--ink-soft);margin:0">Your houses averaged '+avg.toFixed(1)+' of a possible 11.</p>';
+    '<p style="font-size:13px;color:var(--ink-soft);margin:0">Your houses averaged '+avg.toFixed(1)+' of a possible 16.</p>';
   var d=document.getElementById("over");
   if(typeof d.showModal==="function"&&!d.open){ d.showModal(); }
   render();
@@ -1364,7 +1333,7 @@ function render(prefix){
     b.innerHTML=sprite(it.type,0,it.v);
     b.title=NAMES[it.type];
     b.setAttribute("aria-label","Take "+NAMES[it.type]);
-    if(!canTake()) b.disabled=true;
+    if(!canTake()||!canTakeTile(S.you,it.type)) b.disabled=true;
     b.addEventListener("click",function(){ take(i); });
     mk.appendChild(b);
   });
@@ -1389,27 +1358,6 @@ function render(prefix){
     rr.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Road stack empty.</div>';
   }
 
-  var cr=document.getElementById("civicrow");
-  cr.innerHTML="";
-  if(S.civic){
-    var cb=document.createElement("button");
-    cb.type="button"; cb.className="tile";
-    cb.innerHTML=sprite(S.civic,0,0)+'<span class="count">'+(S.civics.length+1)+'</span>';
-    cb.title=NAMES[S.civic];
-    cb.setAttribute("aria-label","Claim the "+NAMES[S.civic]+", costing your whole turn");
-    if(!canCivic()) cb.disabled=true;
-    cb.addEventListener("click",takeCivic);
-    cr.appendChild(cb);
-    var ch=document.createElement("div");
-    ch.style.cssText="font-size:12.5px;color:var(--ink-soft);max-width:20ch";
-    ch.textContent=hasCivic(S.you,S.civic)
-      ? NAMES[S.civic]+" \u2014 you already have one."
-      : NAMES[S.civic]+(S.civic==="sports"?" \u2014 covers 2\u00d72.":"");
-    cr.appendChild(ch);
-  } else {
-    cr.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">No civic buildings left.</div>';
-  }
-
   var hd=document.getElementById("hand");
   hd.innerHTML="";
   if(!P.hand.length){
@@ -1418,10 +1366,9 @@ function render(prefix){
   P.hand.forEach(function(it,i){
     var b=document.createElement("button");
     b.type="button";
-    b.className="tile"+(S.selected===i?" sel":"")+(isPlant(it.type)?" must":"");
+    b.className="tile"+(S.selected===i?" sel":"")+(isCivic(it.type)?" must":"");
     b.innerHTML=sprite(it.type,it.mask,it.v);
-    b.title=it.type==="road"?"Road \u2014 "+SHAPE_NAME[it.mask]
-          :isPlant(it.type)?NAMES[it.type]+" \u2014 must be built":NAMES[it.type];
+    b.title=it.type==="road"?"Road \u2014 "+SHAPE_NAME[it.mask]:NAMES[it.type];
     b.setAttribute("aria-label",(S.selected===i?"Selected ":"Select ")+(it.type==="road"?SHAPE_NAME[it.mask]+" road":NAMES[it.type]));
     if(!canPlace()) b.disabled=true;
     b.addEventListener("click",function(){
@@ -1452,9 +1399,6 @@ function render(prefix){
          '<div class="scoreline"><span>Jobs for citizens</span><span>'+a.jobs+' / '+a.citizens+'</span></div>'+
          '<div class="scoreline"><span>Houses with work</span><span>'+a.employed+' of '+a.houses+'</span></div>'+
          '<div class="scoreline"><span>Your bonus goals</span><span>'+a.goalPts+'</span></div>';
-  if(a.unplaced){
-    bd+='<div class="scoreline warn"><span>Plants not yet built</span><span>\u2212'+a.penalty+'</span></div>';
-  }
   document.getElementById("breakdown").innerHTML=bd;
 
   var msg=prefix||"";
@@ -1475,14 +1419,6 @@ function render(prefix){
     } else if(isRoad(iq.type)){
       msg="<b>"+NAMES[iq.type]+" ("+whose+", "+(SHAPE_NAME[iq.mask]||"junction")+")</b><br>"+
           (mine?"Yours to build along.":"Ada's road. You cannot build off it.");
-    } else if(isPlant(iq.type)){
-      msg="<b>"+NAMES[iq.type]+" ("+whose+")</b><br>"+
-          (mine?"Serves your whole town, wherever it sits. \u22122 to any of yours within 2."
-               :"Serves Ada's town only. Yours is unaffected.");
-    } else if(iq.type==="industrial"){
-      msg="<b>Industrial ("+whose+")</b><br>"+
-          (mine?"4 jobs \u2014 enough for 2 houses, at any distance. \u22123 to any of yours within 2."
-               :"Ada's. It neither helps nor harms your houses.");
     } else if(iq.type==="sports"){
       msg="<b>Sports centre ("+whose+")</b><br>"+
           (mine?"Covers 2\u00d72. <b>+3</b> to your houses within 3 of it."
