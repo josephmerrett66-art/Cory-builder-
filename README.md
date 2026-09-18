@@ -29,14 +29,20 @@ A house starts at 1 point and collects:
 Floors at 0, tops out at 16. Distances are Chebyshev — diagonals count the same
 as straight neighbours, so "within 2" is a 5×5 block.
 
-Each house holds 2 citizens; each factory has 4 jobs. One factory covers two houses.
+Each house holds 2 citizens; each factory has 4 jobs, so one factory covers two
+houses.
+
+**Apartment blocks** hold four citizens and need four jobs. They score double
+whatever a house would score on that tile — but nothing at all unless a park
+*and* a shop sit directly next to them. They are drawn taller than their tile
+and overhang the row above.
 
 ## Turns
 
 Take two tiles, or place two. Never both. At most one road per take turn.
 Civic buildings — sports centre, school and hospital — are shuffled into the
 building deck and surface in the market at random. They cost a normal half-turn,
-and you may only ever own one of each.
+and you may only ever own one of each. The sports centre covers a 2x2 block.
 
 Roads are Carcassonne-style: straights, corners, T-junctions and crossroads that
 must match end to end where two of your roads meet. Buildings go anywhere along

@@ -18,12 +18,14 @@ function fakeEl(){
 }
 const doc = {
   getElementById(){ return fakeEl(); },
+  querySelector(){ return fakeEl(); },
   createElement(){ return fakeEl(); },
   addEventListener(){}
 };
 
 const ctx = {
   document: doc,
+  window: { addEventListener(){}, visualViewport:{ addEventListener(){} } },
   setTimeout(){},          // stop the bot auto-chaining; we drive it manually
   console,
   Math, JSON, Object, Array, String, Number, Boolean, Error, isNaN, parseInt, parseFloat
