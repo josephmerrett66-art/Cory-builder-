@@ -1,0 +1,11 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const {load}=require('./stub');
+const game=load(path.join(__dirname,'..','index.html'),42);
+const tiles=[['House · terracotta','house',0],['House · sandstone','house',1],['Apartment · brick','apartment',0],['Apartment · limestone','apartment',1],['Corner shop','shop',0],['Green grocer','shop',1],['Garden pavilion','park',0],['Fountain garden','park',1],['Playground','park',2],['Flower garden','park',3],['Brick works','industrial',0],['Workshop','industrial',1],['School','school',0],['Hospital','hospital',0]];
+let cards=tiles.map(([label,type,v])=>`<article><div class="art ${type==='apartment'?'tall':''}">${game.sprite(type,0,v)}</div><p>${label}</p></article>`).join('');
+for(const mask of [5,10,3,7,15])cards+=`<article><div class="art">${game.sprite('road',mask,0)}</div><p>Road · ${game.SHAPE_NAME[mask]}</p></article>`;
+cards+=`<article class="wide"><div class="sports">${game.toSvg(game.sportsBig())}</div><p>Sports centre · four connected tiles</p></article>`;
+const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Dusk Town · Tile art</title><style>*{box-sizing:border-box}body{background:#202624;color:#eee8d8;font:15px system-ui;margin:0;padding:36px}main{max-width:1120px;margin:auto}h1{font-size:30px;margin:0 0 8px}header p{color:#aaa995;margin:0 0 32px}.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:18px}article{background:#2a312d;border:1px solid #485044;padding:20px 12px 12px;text-align:center;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-height:250px}article p{font-size:12px;color:#c7c8b5;margin:18px 0 0}.art{width:128px;height:128px;position:relative}.art svg{width:100%;height:100%}.art.tall svg{height:150%;position:absolute;left:0;bottom:0}.sports{width:256px;height:256px}.sports svg{width:100%;height:100%}.wide{grid-column:span 2}svg{image-rendering:pixelated}</style><main><header><h1>Dusk Town / A more detailed city</h1><p>Original pixel artwork · textured masonry, planted streets and a warmer neighbourhood palette</p></header><div class="tiles">${cards}</div></main></html>`;
+fs.writeFileSync(path.join(__dirname,'..','tile-art-preview.html'),html);
+console.log('Wrote tile-art-preview.html');
