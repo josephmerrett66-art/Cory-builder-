@@ -64,8 +64,8 @@
   .board{
     display:grid;
     /* whole-pixel tracks: fractional ones make the 1px gaps round unevenly */
-    grid-template-columns:repeat(13,var(--cellpx,24px));
-    grid-template-rows:repeat(13,var(--cellpx,24px));
+    grid-template-columns:repeat(var(--mapsize,13),var(--cellpx,24px));
+    grid-template-rows:repeat(var(--mapsize,13),var(--cellpx,24px));
     width:max-content;margin:0 auto;
     gap:1px;background:#20241f;padding:1px;
     border:3px solid var(--edge);
@@ -156,6 +156,10 @@
   }
   dialog::backdrop{background:rgba(0,0,0,.72)}
   dialog h2{font-family:"Silkscreen",monospace;font-size:15px;margin:0 0 12px}
+  .map-info{font-size:12px;color:var(--ink-soft);text-align:center;margin:0}
+  #mapsize{display:block;width:100%;margin:7px 0 14px;padding:10px;
+    background:var(--panel2);color:var(--ink);border:2px solid var(--edge2);font:inherit}
+  #setup p{font-size:14px;color:var(--ink-soft)}
   @media (max-width:880px){
     body{padding:10px 6px 30px}
     .wrap{max-width:100%}
@@ -180,13 +184,14 @@
   <div class="layout">
     <div class="boardcol">
       <div class="board" id="board" role="grid" aria-label="The shared city grid"></div>
+      <p class="map-info" id="mapinfo"></p>
 
       <div class="card tight">
         <div class="status" id="status"></div>
         <div class="acts">
           <button class="act" id="rotate">Rotate &#8635;</button>
           <button class="act" id="endturn">End turn</button>
-          <button class="act" id="finish">Finish</button>
+          <button class="act" id="finish" disabled>Results</button>
           <button class="act" id="restart">New game</button>
         </div>
         <div class="rowlabel">Market</div>
@@ -211,7 +216,27 @@
   </div>
 </div>
 
-<dialog id="over">
+<dialog id="setup" aria-labelledby="setuptitle">
+  <h2 id="setuptitle">Choose your map</h2>
+  <p>Smaller maps bring your towns together sooner.</p>
+  <label for="mapsize">Map size</label>
+  <select id="mapsize">
+    <option value="7">7 × 7 — Tiny</option>
+    <option value="9">9 × 9 — Small</option>
+    <option value="11">11 × 11 — Medium</option>
+    <option value="13" selected>13 × 13 — Original</option>
+    <option value="15">15 × 15 — Large</option>
+  </select>
+  <p>The tile supply and scoring ranges stay the same on every map.</p>
+  <p>Play until neither player can legally place another tile, including tiles
+    still in the supply. If you cannot build, pass while the other town continues.</p>
+  <div class="acts">
+    <button class="act" id="startgame">Start game</button>
+    <button class="act" id="cancelsetup" hidden>Keep playing</button>
+  </div>
+</dialog>
+
+<dialog id="over" aria-labelledby="overtitle">
   <h2 id="overtitle">Final scores</h2>
   <div id="overbody"></div>
   <div class="acts" style="margin-top:16px">
@@ -915,8 +940,9 @@ function sprite(type,mask,variant){
 
 /* ===================== rules ===================== */
 var SIZE=13;
-var YOU_GATE={r:12,c:6,mask:N|E|Wd};
-var BOT_GATE={r:0, c:6,mask:Sd|E|Wd};
+var MAP_SIZES=[7,9,11,13,15];
+var YOU_GATE, BOT_GATE;
+var botTimer=null;
 var NAMES={road:"Road",entrance:"Highway entrance",house:"House",park:"Park",
            shop:"Shop",industrial:"Industrial",apartment:"Apartment block",power:"Power plant",water:"Water plant",
            school:"School",hospital:"Hospital",sports:"Sports centre"};
@@ -1075,9 +1101,10 @@ function clearTile(type,r,c){
   var cells=cellsFor(type,r,c);
   for(var i=0;i<cells.length;i++){ S.grid[cells[i][0]][cells[i][1]]=null; }
 }
-function anyLegal(P){
-  for(var h=0;h<P.hand.length;h++){
-    var item=P.hand[h];
+function anyLegal(P,items){
+  items=items||P.hand;
+  for(var h=0;h<items.length;h++){
+    var item=items[h];
     for(var r=0;r<SIZE;r++){
       for(var c=0;c<SIZE;c++){
         if(item.type==="road"){
@@ -1088,6 +1115,26 @@ function anyLegal(P){
     }
   }
   return false;
+}
+/* Include the whole remaining supply: a useful tile may be below the top one.
+   Other players' hands are private supplies and cannot be used here. */
+function canDevelop(P){
+  if(anyLegal(P)) return true;
+  var seen={}, available=[];
+  function add(type,mask){
+    var key=type+":"+mask;
+    if(seen[key]||!canTakeTile(P,type)) return;
+    seen[key]=true;
+    available.push({type:type,mask:mask});
+  }
+  S.market.forEach(function(it){ add(it.type,it.mask); });
+  S.deck.forEach(function(type){ add(type,0); });
+  S.roads.forEach(function(mask){ add("road",mask); });
+  return anyLegal(P,available);
+}
+function canPass(P){
+  var canDraw=S.roads.length>0||S.market.some(function(it){ return canTakeTile(P,it.type); });
+  return !canDevelop(P)||(!anyLegal(P)&&!canDraw);
 }
 /* is this empty cell one of own's open road ends? Building there seals the
    network off, which is how the bot used to strangle itself. */
@@ -1209,7 +1256,15 @@ function score(P){
 function newPlayer(owner){
   return {owner:owner, hand:[], order:0, tookRoad:false};
 }
-function newGame(){
+function newGame(size){
+  clearTimeout(botTimer); botTimer=null;
+  size=Number(size);
+  if(MAP_SIZES.indexOf(size)>=0) SIZE=size;
+  YOU_GATE={r:SIZE-1,c:Math.floor(SIZE/2),mask:N|E|Wd};
+  BOT_GATE={r:0,c:Math.floor(SIZE/2),mask:Sd|E|Wd};
+  document.getElementById("setup").close();
+  document.getElementById("over").close();
+  document.getElementById("board").style.setProperty("--mapsize",SIZE);
   var grid=[], land=[], r, c;
   for(r=0;r<SIZE;r++){
     grid.push(new Array(SIZE).fill(null));
@@ -1222,7 +1277,7 @@ function newGame(){
     you:newPlayer("you"), bot:newPlayer("bot"),
     deck:buildDeck(), market:[], roads:shuffle(roadStack()),
     turn:"you", mode:null, used:0,
-    selected:null, inspect:null, fresh:null, over:false
+    selected:null, inspect:null, fresh:null, over:false, started:true, paused:false
   };
   grid[YOU_GATE.r][YOU_GATE.c]={type:"entrance",mask:YOU_GATE.mask,v:0,order:0,owner:"you"};
   grid[BOT_GATE.r][BOT_GATE.c]={type:"entrance",mask:BOT_GATE.mask,v:0,order:0,owner:"bot"};
@@ -1247,8 +1302,8 @@ function canTakeTile(P,type){
   return !isCivic(type) || !hasCivic(P,type);
 }
 /* ===================== your turn ===================== */
-function canTake(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="take"); }
-function canPlace(){ return !S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="place"); }
+function canTake(){ return S.started&&!S.paused&&!S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="take"); }
+function canPlace(){ return S.started&&!S.paused&&!S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="place"); }
 function take(what){
   if(!canTake()) return;
   var P=S.you;
@@ -1272,18 +1327,19 @@ function place(r,c){
   putTile(P,item,item.mask,r,c);
   P.hand.splice(S.selected,1);
   S.selected=null; S.mode="place"; S.used++; S.inspect={r:r,c:c};
+  if(gameShouldEnd()){ finish(); return; }
   if(S.used>=2){ endTurn(); } else { render(); }
 }
 function endTurn(){
+  if(!S.started||S.paused||S.over||S.turn!=="you") return;
   S.mode=null; S.used=0; S.selected=null; S.you.tookRoad=false;
   if(gameShouldEnd()){ finish(); return; }
   S.turn="bot";
   render("Ada is thinking\u2026 ");
-  setTimeout(botTurn,480);
+  botTimer=setTimeout(botTurn,480);
 }
 function gameShouldEnd(){
-  if(S.deck.length||S.market.length) return false;
-  return !anyLegal(S.you)&&!anyLegal(S.bot);
+  return !canDevelop(S.you)&&!canDevelop(S.bot);
 }
 
 /* ===================== the bot ===================== */
@@ -1392,6 +1448,7 @@ function choosePlacement(P,forcePlants){
   return bestPlacement(P,forcePlants,true) || bestPlacement(P,forcePlants,false);
 }
 function botAct(P){
+  if(!canDevelop(P)) return false;
   var tilesLeft=S.deck.length+S.market.length;
   var forcePlants=false;
   var safe=bestPlacement(P,forcePlants,true);
@@ -1459,10 +1516,15 @@ function botAct(P){
   return false;
 }
 function botTurn(){
+  botTimer=null;
+  if(!S.started||S.paused||S.over||S.turn!=="bot") return;
   var P=S.bot;
   S.fresh=null; S.mode=null; S.used=0; P.tookRoad=false;
   var acted=0;
-  for(var i=0;i<2;i++){ if(botAct(P)) acted++; else break; }
+  for(var i=0;i<2;i++){
+    if(botAct(P)) acted++; else break;
+    if(gameShouldEnd()){ finish(); return; }
+  }
   S.mode=null; S.used=0; P.tookRoad=false;
   if(gameShouldEnd()){ finish(); return; }
   S.turn="you";
@@ -1471,7 +1533,9 @@ function botTurn(){
 
 /* ===================== finish ===================== */
 function finish(){
+  clearTimeout(botTimer); botTimer=null;
   S.over=true;
+  S.inspect=null; S.selected=null;
   var a=score(S.you), b=score(S.bot);
   function block(label,f){
     var h='<div class="scoreline"><span style="color:var(--ink)"><b>'+label+'</b></span><span>'+f.total+'</span></div>';
@@ -1489,6 +1553,7 @@ function finish(){
     }
   });
   document.getElementById("overbody").innerHTML =
+    '<p>No legal placements remain for either player. '+SIZE+' × '+SIZE+' map.</p>'+
     block("You",a)+block("Ada",b)+
     '<p style="font-size:13px;color:var(--ink-soft);margin:0">'+a.houses+' homes, averaging '+avg.toFixed(1)+'. Best: '+best+'.</p>';
   var d=document.getElementById("over");
@@ -1624,7 +1689,12 @@ function render(prefix){
   document.getElementById("breakdown").innerHTML=bd;
 
   var msg=prefix||"";
-  if(S.over&&!S.inspect){
+  var mayPass=canPass(P);
+  if(!S.started){
+    msg="Choose a map size to start.";
+  } else if(!S.over&&S.turn==="you"&&mayPass){
+    msg+="No moves available. Pass to let Ada continue.";
+  } else if(S.over&&!S.inspect){
     msg+="Game over. Tap a tile to inspect it. Results for scores.";
   } else if(S.turn==="bot"&&!S.inspect){
     msg+="Ada's turn.";
@@ -1675,8 +1745,12 @@ function render(prefix){
   document.getElementById("status").innerHTML=msg;
 
   document.getElementById("rotate").disabled=!(item&&item.type==="road");
-  document.getElementById("endturn").disabled=S.over||S.turn!=="you"||S.used===0;
-  document.getElementById("finish").textContent=S.over?"Results":"Finish";
+  document.getElementById("endturn").disabled=!S.started||S.paused||S.over||S.turn!=="you"||(S.used===0&&!mayPass);
+  document.getElementById("endturn").textContent=mayPass&&S.used===0?"Pass":"End turn";
+  document.getElementById("finish").disabled=!S.over;
+  var empty=0;
+  each(function(r,c,q){ if(!q) empty++; });
+  document.getElementById("mapinfo").textContent=SIZE+" × "+SIZE+" map · "+empty+" empty plots";
 }
 
 /* ===================== legend ===================== */
@@ -1740,12 +1814,32 @@ function doRotate(){
 }
 document.getElementById("rotate").addEventListener("click",doRotate);
 document.getElementById("endturn").addEventListener("click",function(){
-  if(S.turn==="you"&&S.used>0) endTurn();
+  if(S.turn==="you"&&(S.used>0||canPass(S.you))) endTurn();
 });
-document.getElementById("finish").addEventListener("click",finish);
-document.getElementById("restart").addEventListener("click",function(){
-  var d=document.getElementById("over"); if(d.open) d.close();
-  newGame();
+document.getElementById("finish").addEventListener("click",function(){ if(S.over) finish(); });
+function showSetup(){
+  clearTimeout(botTimer); botTimer=null;
+  S.paused=true;
+  document.getElementById("over").close();
+  document.getElementById("mapsize").value=String(SIZE);
+  document.getElementById("cancelsetup").hidden=!S.started;
+  render();
+  document.getElementById("setup").showModal();
+}
+function closeSetup(){
+  if(!S.started) return;
+  document.getElementById("setup").close();
+  S.paused=false;
+  render();
+  if(S.turn==="bot"&&!S.over) botTimer=setTimeout(botTurn,480);
+}
+document.getElementById("restart").addEventListener("click",showSetup);
+document.getElementById("startgame").addEventListener("click",function(){
+  newGame(document.getElementById("mapsize").value);
+});
+document.getElementById("cancelsetup").addEventListener("click",closeSetup);
+document.getElementById("setup").addEventListener("cancel",function(ev){
+  ev.preventDefault(); closeSetup();
 });
 document.getElementById("viewmap").addEventListener("click",function(){
   var d=document.getElementById("over");
@@ -1755,14 +1849,14 @@ document.getElementById("viewmap").addEventListener("click",function(){
 document.getElementById("over").addEventListener("click",function(ev){
   if(ev.target===this) this.close();   // tap the backdrop to get the map back
 });
-document.getElementById("again").addEventListener("click",function(){
-  document.getElementById("over").close(); newGame();
-});
+document.getElementById("again").addEventListener("click",showSetup);
 document.addEventListener("keydown",function(ev){
   if(ev.key==="r"||ev.key==="R") doRotate();
 });
 
 newGame();
+S.started=false;
+showSetup();
 </script>
 </body>
 </html>

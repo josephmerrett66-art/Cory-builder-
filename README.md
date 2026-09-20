@@ -6,7 +6,9 @@ Open `index.html` in a browser. No build step, no dependencies — one self-cont
 
 ## The game
 
-Two towns grow on one 13×13 plot of land. You enter from the south edge, Ada from
+Choose a 7×7, 9×9, 11×11, 13×13 (original), or 15×15 map before each game.
+The tile supply and scoring ranges stay the same, so smaller maps make space
+more contested. Two towns grow on the shared land. You enter from the south edge, Ada from
 the north. Your roads, parks and plants are yours alone: hers do nothing for you,
 and yours nothing for her. What you are competing for is space.
 
@@ -47,9 +49,19 @@ and you may only ever own one of each. The sports centre covers a 2x2 block.
 
 Roads are Carcassonne-style: straights, corners, T-junctions and crossroads that
 must match end to end where two of your roads meet. Buildings go anywhere along
-your own road. The game ends when the deck runs dry and neither player can place.
+your own road. The game ends immediately when neither player can legally place
+another tile from their hand or the remaining supply (including roads). The board
+does not have to be completely full, and unused tiles may remain. If one player
+cannot make progress, they pass while the other continues. Final scores appear
+automatically after the last possible placement.
+
+**New game** and **Play again** reopen the map-size chooser. Opening it pauses
+Ada's turn; **Keep playing** resumes the existing game without resetting it.
 
 ## Tools
+
+`node tools/test-game.js` checks map sizing, supply-aware endings, passing,
+immediate final scoring, and complete seeded games on the smaller maps.
 
 `tools/sim.js` runs headless games for balance testing:
 
