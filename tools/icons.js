@@ -8,7 +8,7 @@ function runs(grid){
     while(x<row.length){
       const ch=row[x]; let w=1;
       while(x+w<row.length && row[x+w]===ch) w++;
-      const col=ctx.PAL[ch] || (ch.startsWith('#') ? ch : null);
+      const col=ctx.PAL[ch];
       if(col) out.push([x,y,w,col]);
       x+=w;
     }

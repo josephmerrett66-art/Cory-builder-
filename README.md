@@ -72,14 +72,3 @@ node tools/sim.js
 It stubs the DOM, drives both sides with the bot's own logic, and reports tiles
 placed, houses built, scores, and tiles stranded in hand. It is how the bot's
 network-strangling bug was found and fixed.
-
-## Tile artwork
-
-Original 64×64 pixel tiles use a three-quarter building view, textured masonry,
-shaded roofs, planted gardens, shop awnings and detailed roads. Apartments use
-a 64×96 image with a transparent overhang; the sports centre is a continuous
-128×128 image split across four cells. Colours are grouped into SVG paths to
-keep the board lightweight.
-
-Run `node tools/preview-art.js` to regenerate `tile-art-preview.html`, a visual
-catalogue of the buildings, park variants, roads and complete sports centre.
