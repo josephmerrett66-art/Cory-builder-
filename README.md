@@ -4,6 +4,11 @@ A cozy tile-laying city builder, played against a bot opponent on a shared map.
 
 Open `index.html` in a browser. No build step, no dependencies — one self-contained file.
 
+Use the **Art** setting in the header to switch between the new warm illustrated
+tabletop tiles and the original pixel art. The choice is saved in the browser.
+The illustrated theme uses the generated atlas in `assets/illustrated-tiles.png`;
+roads remain code-drawn so their connections are always exact.
+
 ## The game
 
 Choose a 7×7, 9×9, 11×11, 13×13 (original), or 15×15 map before each game.

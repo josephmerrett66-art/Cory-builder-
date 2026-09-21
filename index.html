@@ -28,6 +28,14 @@
       --ok:#121416; --bad:#3d4145; --focus:#121416;
     }
   }
+  :root[data-art="illustrated"]{
+    --bg:#e7d6b5;--bg2:#c9b082;
+    --panel:#f4ead5;--panel2:#dfcba7;
+    --edge:#4e3d2a;--edge2:#9b7b52;
+    --ink:#30261b;--ink-soft:#6b5840;
+    --verge:#769451;--gold:#b56b32;--ada:#667b83;
+    --ok:#3f7652;--bad:#a84f3f;--focus:#fff3c9;
+  }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
@@ -35,6 +43,13 @@
     background-attachment:fixed;color:var(--ink);
     font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     font-size:15px;line-height:1.55;padding:12px 10px 40px;
+  }
+  :root[data-art="illustrated"] body{
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(circle at 18% 8%,rgba(255,250,221,.72),transparent 34%),
+      linear-gradient(145deg,var(--bg),var(--bg2));
+    font-family:Georgia,"Times New Roman",serif;
   }
   .wrap{max-width:1080px;margin:0 auto}
   .topbar{
@@ -44,6 +59,26 @@
   h1{
     font-family:"Silkscreen","Courier New",monospace;font-weight:700;
     font-size:17px;letter-spacing:.02em;margin:0;text-shadow:2px 2px 0 var(--edge);
+  }
+  :root[data-art="illustrated"] h1,
+  :root[data-art="illustrated"] .rowlabel,
+  :root[data-art="illustrated"] .card h2,
+  :root[data-art="illustrated"] .status,
+  :root[data-art="illustrated"] button.act,
+  :root[data-art="illustrated"] .vs-side .who,
+  :root[data-art="illustrated"] .vs-side .num,
+  :root[data-art="illustrated"] .scoreline span:last-child,
+  :root[data-art="illustrated"] .count{
+    font-family:Georgia,"Times New Roman",serif;
+    letter-spacing:.02em;text-shadow:none;
+  }
+  .top-tools{display:flex;align-items:center;gap:13px}
+  .art-picker{display:flex;align-items:center;gap:6px;color:var(--ink-soft);font-size:12px}
+  .art-picker select{
+    appearance:none;background:var(--panel);color:var(--ink);border:2px solid var(--edge2);
+    border-radius:0;padding:5px 25px 5px 8px;font:inherit;line-height:1.1;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,var(--ink) 50%),linear-gradient(135deg,var(--ink) 50%,transparent 50%);
+    background-position:calc(100% - 11px) 50%,calc(100% - 7px) 50%;background-size:4px 4px;background-repeat:no-repeat;
   }
   .scores{display:flex;gap:14px;align-items:baseline}
   .vs-side{display:flex;gap:5px;align-items:baseline}
@@ -71,6 +106,10 @@
     border:3px solid var(--edge);
     box-shadow:0 0 0 2px var(--edge2);
   }
+  :root[data-art="illustrated"] .board{
+    gap:2px;background:#5d4a31;padding:2px;border-width:4px;
+    box-shadow:0 5px 18px rgba(50,35,20,.38),0 0 0 2px #ba9867;
+  }
   .cell svg{position:relative;z-index:0}
   .cell{overflow:visible}
   .cell.tall svg{
@@ -81,10 +120,30 @@
     background:var(--verge);display:block;position:relative;cursor:default;
   }
   .cell svg{display:block;width:100%;height:100%}
+  .illustrated-sprite{
+    display:block;width:100%;height:100%;position:relative;overflow:hidden;
+    background-image:url("assets/illustrated-tiles.png");
+    background-size:400% 400%;background-position:var(--ax,0%) var(--ay,0%);
+    background-repeat:no-repeat;
+  }
+  .illustrated-sprite.art-sports{background-size:800% 800%}
+  .illustrated-road{background-position:0 0}
+  .road-arm,.road-core{position:absolute;display:block;background:#74716a;z-index:1}
+  .road-core{left:33%;top:33%;width:34%;height:34%;box-shadow:inset 0 0 0 2px #c4b17f}
+  .road-arm.n,.road-arm.s{
+    left:33%;width:34%;height:52%;
+    background:linear-gradient(90deg,#c4b17f 0 8%,#74716a 8% 45%,#f1e7c9 45% 55%,#74716a 55% 92%,#c4b17f 92%);
+  }
+  .road-arm.n{top:-1%}.road-arm.s{bottom:-1%}
+  .road-arm.e,.road-arm.w{
+    top:33%;height:34%;width:52%;
+    background:linear-gradient(0deg,#c4b17f 0 8%,#74716a 8% 45%,#f1e7c9 45% 55%,#74716a 55% 92%,#c4b17f 92%);
+  }
+  .road-arm.e{right:-1%}.road-arm.w{left:-1%}
   .cell.own-you::before,.cell.own-bot::before{
     content:"";position:absolute;top:0;right:0;
     border-top:7px solid var(--gold);border-left:7px solid transparent;
-    filter:drop-shadow(-1px 1px 0 rgba(0,0,0,.7));
+    filter:drop-shadow(-1px 1px 0 rgba(0,0,0,.7));z-index:7;
   }
   .cell.own-bot::before{border-top-color:var(--ada)}
   .cell.legal::after{
@@ -96,6 +155,11 @@
   .cell.fresh{box-shadow:inset 0 0 0 3px var(--ada)}
   .cell:focus-visible{outline:3px solid var(--focus);outline-offset:-3px;z-index:2}
   .card{background:var(--panel);border:3px solid var(--edge);padding:12px 13px}
+  :root[data-art="illustrated"] .card,
+  :root[data-art="illustrated"] dialog{
+    border-radius:5px;box-shadow:0 4px 12px rgba(55,39,22,.2);
+    background-image:linear-gradient(rgba(255,255,255,.14),rgba(255,255,255,0));
+  }
   .card.tight{padding:10px 11px}
   .card h2{
     font-family:"Silkscreen","Courier New",monospace;font-size:11px;font-weight:700;
@@ -108,6 +172,7 @@
     box-shadow:0 0 0 1px var(--edge2);
   }
   .tile svg{display:block;width:100%;height:100%}
+  .tile .illustrated-sprite{display:block;width:100%;height:100%}
   .tile.tall{overflow:visible}
   .tile.tall svg{position:absolute;left:0;bottom:0;height:150%}
   .tile[disabled]{opacity:.35;cursor:not-allowed}
@@ -145,6 +210,7 @@
   }
   .legend div:first-of-type{border-top:0}
   .legend svg{width:34px;height:34px;flex:0 0 34px;display:block;border:2px solid var(--edge)}
+  .legend .illustrated-sprite{width:38px;height:38px;flex:0 0 38px;border:2px solid var(--edge)}
   .legend svg.tall{height:51px}
   .legend b{color:var(--ink)}
   .legend .note{
@@ -166,6 +232,10 @@
     .boardcol{flex:1 1 100%;max-width:100%;min-width:0}
     .tile{width:42px;height:42px}
   }
+  @media (max-width:620px){
+    .topbar{align-items:flex-start}.top-tools{align-items:flex-end;flex-direction:column;gap:5px}
+    .art-picker{font-size:11px}
+  }
   @media (max-width:380px){
     .tile{width:38px;height:38px}
   }
@@ -175,9 +245,17 @@
 <div class="wrap">
   <div class="topbar">
     <h1>Dusk Town</h1>
-    <div class="scores">
-      <span class="vs-side" id="vsyou"><i class="who">You</i><b class="num">0</b></span>
-      <span class="vs-side" id="vsbot"><i class="who">Ada</i><b class="num">0</b></span>
+    <div class="top-tools">
+      <label class="art-picker" for="artstyle">Art
+        <select id="artstyle" aria-label="Art style">
+          <option value="illustrated">Illustrated</option>
+          <option value="pixel">Pixel</option>
+        </select>
+      </label>
+      <div class="scores">
+        <span class="vs-side" id="vsyou"><i class="who">You</i><b class="num">0</b></span>
+        <span class="vs-side" id="vsbot"><i class="who">Ada</i><b class="num">0</b></span>
+      </div>
     </div>
   </div>
 
@@ -247,6 +325,15 @@
 
 <script>
 "use strict";
+
+var ART_STYLE="illustrated";
+try{
+  if(window.localStorage){
+    var savedArt=window.localStorage.getItem("dusk-town-art-style");
+    if(savedArt==="pixel"||savedArt==="illustrated") ART_STYLE=savedArt;
+  }
+}catch(ignoreArtStorage){}
+if(document.documentElement) document.documentElement.setAttribute("data-art",ART_STYLE);
 
 /* ===================== palette ===================== */
 var PAL = {
@@ -917,9 +1004,38 @@ function toSvg(g){
   return out+'</svg>';
 }
 
-function sprite(type,mask,variant){
+function artSprite(type,mask,variant,whole){
   variant=variant||0;
-  var key=type+":"+mask+":"+variant;
+  if(type==="road"||type==="entrance"){
+    var arms="";
+    if(mask&N) arms+='<i class="road-arm n"></i>';
+    if(mask&E) arms+='<i class="road-arm e"></i>';
+    if(mask&Sd) arms+='<i class="road-arm s"></i>';
+    if(mask&Wd) arms+='<i class="road-arm w"></i>';
+    return '<span class="illustrated-sprite illustrated-road" aria-hidden="true"><i class="road-core"></i>'+arms+'</span>';
+  }
+  if(type==="sports"){
+    if(whole) return '<span class="illustrated-sprite" style="--ax:33.3333%;--ay:100%" aria-hidden="true"></span>';
+    var part=variant||0, sx=(2+(part%2))/7*100, sy=(6+Math.floor(part/2))/7*100;
+    return '<span class="illustrated-sprite art-sports" style="--ax:'+sx+'%;--ay:'+sy+'%" aria-hidden="true"></span>';
+  }
+  var positions={
+    apartment:[100,0], industrial:[66.6667,66.6667], school:[100,66.6667],
+    hospital:[0,100], power:[66.6667,66.6667], water:[0,33.3333]
+  };
+  var pos;
+  if(type==="grass") pos=[[0,0],[66.6667,100],[100,100]][variant%3];
+  else if(type==="house") pos=variant%2?[66.6667,0]:[33.3333,0];
+  else if(type==="park") pos=[[0,33.3333],[33.3333,33.3333],[100,33.3333],[66.6667,33.3333]][variant%4];
+  else if(type==="shop") pos=variant%2?[33.3333,66.6667]:[0,66.6667];
+  else pos=positions[type]||[0,0];
+  return '<span class="illustrated-sprite'+(type==="apartment"?' tall':'')+'" style="--ax:'+pos[0]+'%;--ay:'+pos[1]+'%" aria-hidden="true"></span>';
+}
+
+function sprite(type,mask,variant,whole){
+  variant=variant||0;
+  if(ART_STYLE==="illustrated") return artSprite(type,mask,variant,whole);
+  var key=type+":"+mask+":"+variant+":"+(whole?1:0);
   if(cache[key]) return cache[key];
   var g;
   if(type==="grass") g=grassSprite(variant);
@@ -931,7 +1047,7 @@ function sprite(type,mask,variant){
   else if(type==="power") g=powerSprite();
   else if(type==="school") g=schoolSprite();
   else if(type==="hospital") g=hospitalSprite();
-  else if(type==="sports") g=sportsSprite(variant);
+  else if(type==="sports") g=whole?sportsBig():sportsSprite(variant);
   else if(type==="apartment") g=apartmentSprite(variant);
   else g=waterSprite();
   cache[key]=toSvg(g);
@@ -1640,7 +1756,7 @@ function paintBoard(){
   for(var r=0;r<SIZE;r++){
     for(var c=0;c<SIZE;c++,i++){
       var b=cellEls[i], q=S.grid[r][c];
-      var sig = q ? q.type+":"+q.mask+":"+q.v+":"+q.owner : "grass:"+S.land[r][c];
+      var sig = ART_STYLE+":"+(q ? q.type+":"+q.mask+":"+q.v+":"+q.owner : "grass:"+S.land[r][c]);
       var tall = !!q && q.type==="apartment";
       if(b.dataset.sig!==sig){
         b.innerHTML = q ? sprite(q.type,q.mask,q.v) : sprite("grass",0,S.land[r][c]);
@@ -1675,7 +1791,7 @@ function render(prefix){
   S.market.forEach(function(it,i){
     var b=document.createElement("button");
     b.type="button"; b.className="tile"+(it.type==="apartment"?" tall":"");
-    b.innerHTML=sprite(it.type,0,it.v);
+    b.innerHTML=sprite(it.type,0,it.v,true);
     b.title=NAMES[it.type];
     b.setAttribute("aria-label","Take "+NAMES[it.type]);
     if(!canTake()||!canTakeTile(S.you,it.type)) b.disabled=true;
@@ -1713,7 +1829,7 @@ function render(prefix){
     b.type="button";
     b.className="tile"+(S.selected===i?" sel":"")+(isCivic(it.type)?" must":"")+
       (it.type==="apartment"?" tall":"");
-    b.innerHTML=sprite(it.type,it.mask,it.v);
+    b.innerHTML=sprite(it.type,it.mask,it.v,true);
     b.title=it.type==="road"?"Road \u2014 "+SHAPE_NAME[it.mask]:NAMES[it.type];
     b.setAttribute("aria-label",(S.selected===i?"Selected ":"Select ")+(it.type==="road"?SHAPE_NAME[it.mask]+" road":NAMES[it.type]));
     if(!canPlace()) b.disabled=true;
@@ -1805,8 +1921,8 @@ function render(prefix){
   document.getElementById("mapinfo").textContent=SIZE+" × "+SIZE+" map · "+empty+" empty plots";
 }
 
-/* ===================== legend ===================== */
-(function(){
+/* ===================== legend and art style ===================== */
+function renderLegend(){
   var rows=[
     ["house",0,0,"House","2 citizens. Worth <b>1</b> point, then:<br>"+
       "<b>+1</b> park within 1<br>"+
@@ -1830,11 +1946,26 @@ function render(prefix){
   document.getElementById("legend").innerHTML=
     '<p class="note">Distance is measured as a square, with diagonals included. Connected shops must share an edge. Only your own tiles count.</p>'+
     rows.map(function(row){
-      var svg=sprite(row[0],row[1],row[2]);
-      if(row[0]==="apartment") svg=svg.replace("<svg ","<svg class=\"tall\" ");
-      return '<div>'+svg+'<span><b>'+row[3]+'</b><br>'+row[4]+'</span></div>';
+      var art=sprite(row[0],row[1],row[2],true);
+      if(row[0]==="apartment") art=art.replace("<svg ","<svg class=\"tall\" ");
+      return '<div>'+art+'<span><b>'+row[3]+'</b><br>'+row[4]+'</span></div>';
     }).join("");
-})();
+}
+function setArtStyle(style){
+  if(style!=="pixel"&&style!=="illustrated") return;
+  ART_STYLE=style;
+  if(document.documentElement) document.documentElement.setAttribute("data-art",style);
+  var picker=document.getElementById("artstyle");
+  if(picker) picker.value=style;
+  try{ if(window.localStorage) window.localStorage.setItem("dusk-town-art-style",style); }catch(ignoreArtStorage){}
+  if(cellEls){ cellEls.forEach(function(el){ el.dataset.sig=""; }); }
+  renderLegend();
+  if(S) render();
+}
+var artPicker=document.getElementById("artstyle");
+artPicker.value=ART_STYLE;
+artPicker.addEventListener("change",function(){ setArtStyle(this.value); });
+renderLegend();
 
 /* The 1px grid lines only stay even if every cell is a whole number of
    pixels, so the track size is computed rather than left to fractions. */
@@ -1844,7 +1975,7 @@ function fitBoard(){
   if(!col||!board) return;
   var avail=col.clientWidth;
   if(!avail) return;
-  var chrome=2+(SIZE-1)+6;                 /* padding + gaps + border */
+  var chrome=ART_STYLE==="illustrated" ? 12+2*(SIZE-1) : 8+(SIZE-1);
   var cell=Math.floor((avail-chrome)/SIZE);
   cell=Math.max(14,Math.min(46,cell));
   board.style.setProperty("--cellpx",cell+"px");

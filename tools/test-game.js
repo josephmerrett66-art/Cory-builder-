@@ -18,6 +18,16 @@ test('first visit requires map selection', () => {
   assert.equal(game.document.getElementById('setup').open,true);
   assert.equal(game.canTake(),false);
 });
+test('art style can switch without changing game state',()=>{
+  const state=game.S;
+  game.setArtStyle('pixel');
+  assert.equal(game.ART_STYLE,'pixel');
+  assert.match(game.sprite('house',0,0),/^<svg/);
+  game.setArtStyle('illustrated');
+  assert.equal(game.ART_STYLE,'illustrated');
+  assert.match(game.sprite('industrial',0,0),/illustrated-sprite/);
+  assert.equal(game.S,state);
+});
 for(const size of [7,9,11,13,15]) test(`${size}×${size} grid, centred entrances and live supply`,()=>{
   game.newGame(size);
   assert.equal(game.S.grid.length,size);
