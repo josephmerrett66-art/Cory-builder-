@@ -140,9 +140,20 @@ test('hospital activates at 10 citizens and no longer changes nearby homes',()=>
   assert.equal(s.citizens,10); assert.equal(s.hospitalPts,8);
   assert.equal(s.housePts,5);
 });
-test('school and sports centre residential bonuses remain unchanged',()=>{
+test('school catchment and sports centre bonuses combine',()=>{
   scoringTown(); tile(3,3,'house'); tile(1,1,'school'); tile(0,3,'sports');
   assert.equal(game.score(game.S.you).housePts,7);
+});
+test('school catchments penalise uncovered homes once and never stack',()=>{
+  scoringTown();
+  tile(2,2,'school'); tile(2,4,'school');
+  tile(3,3,'house');                         // covered by both: 1 + 3, not +6
+  tile(6,6,'house');                         // outside both: 1 - 1, not -2
+  assert.equal(game.score(game.S.you).housePts,4);
+});
+test('a school disabled by nearby industry has no catchment effect',()=>{
+  scoringTown(); tile(2,2,'school'); tile(2,3,'industrial'); tile(6,6,'house');
+  assert.equal(game.score(game.S.you).housePts,1);
 });
 for(const size of [7,9]) test(`complete seeded ${size}×${size} game reaches a natural ending`,()=>{
   game.newGame(size);

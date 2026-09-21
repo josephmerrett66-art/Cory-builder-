@@ -21,7 +21,8 @@ A House is worth **1 point**, holds 2 citizens, and can collect:
 |---|---|
 | +1 | park within 1 |
 | +3 | sports centre within 3 |
-| +3 | school within 2 |
+| +3 | inside an active school catchment |
+| −1 | outside every active school catchment |
 | −3 | industry within 2 |
 
 House scores floor at 0. Distances are Chebyshev — diagonals count the same as
@@ -42,7 +43,12 @@ score 0, 2, 7, and 12 points. Every shop beyond the fourth adds 5 more. Diagonal
 shops do not connect.
 
 A **Hospital** scores 0 below 10 citizens and 8 points once its town reaches
-10 citizens. School and Sports Centre rules are unchanged.
+10 citizens.
+
+An active **School** has a catchment of 2 squares. Every home inside at least
+one active catchment gets 3 points, while every home outside all active
+catchments loses 1 point. Overlapping Schools never stack. A School remains
+inactive if Industry is within 2 of it. The Sports Centre rule is unchanged.
 
 ## Turns
 

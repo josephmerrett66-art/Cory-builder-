@@ -1182,22 +1182,24 @@ function openEnds(own){
 
 /* ===================== scoring ===================== */
 /* Residential tiles are scored against their own town only. */
-/* a school only teaches if industry isn't breathing down its neck */
-function hasActiveSchool(r,c,own){
-  for(var y=Math.max(0,r-2);y<=Math.min(SIZE-1,r+2);y++){
-    for(var x=Math.max(0,c-2);x<=Math.min(SIZE-1,c+2);x++){
-      var q=S.grid[y][x];
-      if(!q||q.type!=="school"||q.owner!==own) continue;
-      if(!near(y,x,2,"industrial",own)) return true;
-    }
-  }
-  return false;
+/* A school only teaches if industry isn't breathing down its neck. Homes in
+   overlapping catchments receive the school effect once, never per school. */
+function schoolCoverage(r,c,own){
+  var any=false, covered=false;
+  each(function(y,x,q){
+    if(!q||q.type!=="school"||q.owner!==own||near(y,x,2,"industrial",own)) return;
+    any=true;
+    if(Math.max(Math.abs(y-r),Math.abs(x-c))<=2) covered=true;
+  });
+  return {any:any,covered:covered};
 }
 function houseScore(r,c,own){
   var p=1, plus=["+1 residential base"], minus=[];
   if(near(r,c,1,"park",own)){ p+=1; plus.push("+1 park"); }
   if(near(r,c,3,"sports",own)){ p+=3; plus.push("+3 sports centre"); }
-  if(hasActiveSchool(r,c,own)){ p+=3; plus.push("+3 school"); }
+  var school=schoolCoverage(r,c,own);
+  if(school.covered){ p+=3; plus.push("+3 school catchment"); }
+  else if(school.any){ p-=1; minus.push("\u22121 outside school catchment"); }
   if(near(r,c,2,"industrial",own)){ p-=3; minus.push("\u22123 industry within 2"); }
   return {points:Math.max(0,p),plus:plus,minus:minus};
 }
@@ -1770,7 +1772,7 @@ function render(prefix){
       var dead=near(S.inspect.r,S.inspect.c,2,"industrial",iq.owner);
       msg="<b>School ("+whose+")</b><br>"+
           (mine?(dead?"Industry within 2. Gives nothing."
-                     :"+3 to your houses within 2.")
+                     :"Homes within 2 get +3; homes outside all active catchments get \u22121. Catchments never stack.")
                :"Ada's. No effect on your houses.");
     } else if(iq.type==="hospital"){
       var hosp=score(iq.owner==="you"?S.you:S.bot);
@@ -1809,7 +1811,7 @@ function render(prefix){
     ["house",0,0,"House","2 citizens. Worth <b>1</b> point, then:<br>"+
       "<b>+1</b> park within 1<br>"+
       "<b>+3</b> sports centre within 3<br>"+
-      "<b>+3</b> school within 2<br>"+
+      "<b>+3</b> inside an active school catchment, or <b>\u22121</b> outside<br>"+
       "<b>\u22123</b> industry within 2<br>"+
       "Never below 0."],
     ["apartment",0,0,"Apartment block","4 citizens, so it needs 4 jobs.<br>"+
@@ -1821,7 +1823,7 @@ function render(prefix){
       "A house needs 2, an apartment 4 \u2014 one factory covers three houses.<br>"+
       "<b>+1</b> per 2 employed citizens. <b>\u22123</b> to each home within 2."],
     ["sports",0,0,"Sports centre","<b>+3</b> to each of your houses within 3.<br>Occupies 2\u00d72. One per player."],
-    ["school",0,0,"School","<b>+3</b> to each of your houses within 2.<br>Gives nothing if any industry is within 2 of it. One per player."],
+    ["school",0,0,"School","Homes within 2 get <b>+3</b>; homes outside all active catchments get <b>\u22121</b>.<br>Catchments never stack. Gives nothing if industry is within 2. One per player."],
     ["hospital",0,0,"Hospital","<b>0</b> below 10 citizens; <b>8</b> at 10+ citizens. One per player."],
     ["road",7,0,"Road","No points. Every building must touch one of your roads.<br>Where two of your roads meet, the open ends must match."]
   ];

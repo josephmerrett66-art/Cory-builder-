@@ -22,7 +22,7 @@ def icon(c,name,x,y,size):
 COL1=[
  ("house","HOUSE","2 citizens \u00b7 1 point",
   ["+1  park within 1","+3  sports centre within 3",
-   "+3  school within 2","\u22123  industry within 2","never below 0"]),
+   "+3  in school catchment \u00b7 \u22121 outside","\u22123  industry within 2","never below 0"]),
  ("apartment","APARTMENT","4 citizens",
   ["double a house on that tile","0 unless a park AND a shop",
    "are directly next to it"]),
@@ -36,7 +36,7 @@ COL2=[
   ["1 / 2 / 3 / 4 shops: 0 / 2 / 7 / 12","each extra shop: +5"]),
  ("sports","SPORTS CENTRE","2x2 \u00b7 one each", ["+3 to your homes within 3"]),
  ("school","SCHOOL","one each",
-  ["+3 to your homes within 2","nothing if industry within 2 of it"]),
+  ["homes within 2: +3 \u00b7 outside: \u22121","no stacking \u00b7 disabled by industry within 2"]),
  ("hospital","HOSPITAL","one each",
   ["below 10 citizens: 0 points","10+ citizens: 8 points"]),
  ("road","ROAD","no points",
