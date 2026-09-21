@@ -12,33 +12,37 @@ more contested. Two towns grow on the shared land. You enter from the south edge
 the north. Your roads, parks and plants are yours alone: hers do nothing for you,
 and yours nothing for her. What you are competing for is space.
 
-**Only houses score, and only your own.** Everything else exists to make houses
-worth more. Your total is simply the sum of your houses.
+Each building now has a distinct scoring role. Only your own buildings and
+citizens count.
 
-A home starts at **0** and collects:
+A House is worth **1 point**, holds 2 citizens, and can collect:
 
 | | |
 |---|---|
-| +2 | park within 2 |
-| +2 | shop within 2 |
-| +2 | employed (a factory with spare jobs, any distance) |
+| +1 | park within 1 |
 | +3 | sports centre within 3 |
 | +3 | school within 2 |
-| +3 | hospital within 4 |
 | −3 | industry within 2 |
-| −3 | hospital within 1 |
 
-Floors at 0, tops out at 15 — and a home with no amenity and no job is worth
-nothing at all. Distances are Chebyshev — diagonals count the same
-as straight neighbours, so "within 2" is a 5×5 block.
+House scores floor at 0. Distances are Chebyshev — diagonals count the same as
+straight neighbours, so "within 1" is the 3×3 block around a tile.
 
 A house holds 2 citizens and an apartment 4; each factory has 6 jobs, so one
-factory covers three houses. Distance is irrelevant — people commute.
+factory covers three houses. Distance is irrelevant — people commute. Every
+2 employed citizens score **1 point**, so a fully used factory can contribute
+up to 3 employment points.
 
 **Apartment blocks** hold four citizens and need four jobs. They score double
 whatever a house would score on that tile — but nothing at all unless a park
 *and* a shop sit directly next to them. They are drawn taller than their tile
 and overhang the row above.
+
+**Shops** score as orthogonally connected districts: groups of 1, 2, 3, and 4
+score 0, 2, 7, and 12 points. Every shop beyond the fourth adds 5 more. Diagonal
+shops do not connect.
+
+A **Hospital** scores 0 below 10 citizens and 8 points once its town reaches
+10 citizens. School and Sports Centre rules are unchanged.
 
 ## Turns
 

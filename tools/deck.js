@@ -1,6 +1,10 @@
 const {load}=require('./stub');
 const fs=require('fs');
-const ctx=load('/home/claude/work/dusk-town.html');
+const path=require('path');
+const root=path.join(__dirname,'..');
+const outDir=path.join(root,'tmp','pdfs');
+fs.mkdirSync(outDir,{recursive:true});
+const ctx=load(path.join(root,'index.html'));
 
 // a fixed, balanced deck for the physical set (the digital one randomises within bands)
 const square=[];
@@ -62,7 +66,7 @@ function pack(list){
   });
 }
 const out={square:pack(square), tall:pack(tall), big:pack(big)};
-fs.writeFileSync('/home/claude/deck.json',JSON.stringify(out));
+fs.writeFileSync(path.join(outDir,'deck.json'),JSON.stringify(out));
 const tally={};
 square.concat(tall,big).forEach(t=>tally[t.label]=(tally[t.label]||0)+1);
 console.log('square:',out.square.length,' tall:',out.tall.length,' 2x2:',out.big.length,

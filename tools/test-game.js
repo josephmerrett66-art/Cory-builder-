@@ -93,6 +93,57 @@ test('paused Ada cannot change the board',()=>{
   const snapshot=JSON.stringify(game.S); game.botTurn();
   assert.equal(JSON.stringify(game.S),snapshot);
 });
+function scoringTown(){
+  game.newGame(7);
+  for(let r=0;r<7;r++) for(let c=0;c<7;c++) game.S.grid[r][c]=null;
+}
+function tile(r,c,type,owner='you'){
+  game.S.grid[r][c]={type,owner,mask:0,v:0,order:0,root:`${r},${c}`};
+}
+test('houses score 1 base and parks add 1 only within one square',()=>{
+  scoringTown(); tile(3,3,'house');
+  assert.equal(game.score(game.S.you).housePts,1);
+  tile(2,2,'park'); assert.equal(game.score(game.S.you).housePts,2);
+  game.S.grid[2][2]=null; tile(1,1,'park');
+  assert.equal(game.score(game.S.you).housePts,1);
+});
+test('apartments stay at 0 until an adjacent park and shop activate double scoring',()=>{
+  scoringTown(); tile(3,3,'apartment');
+  tile(3,2,'park'); assert.equal(game.score(game.S.you).housePts,0);
+  tile(3,4,'shop'); assert.equal(game.score(game.S.you).housePts,4);
+});
+test('shops score orthogonal connected districts and ignore diagonal contact',()=>{
+  scoringTown();
+  tile(1,1,'shop'); tile(1,2,'shop'); tile(2,2,'shop');
+  tile(4,4,'shop'); tile(5,5,'shop');
+  const s=game.score(game.S.you);
+  assert.deepEqual(Array.from(s.shopGroups),[3,1,1]);
+  assert.equal(s.shopPts,7);
+  tile(2,3,'shop'); tile(2,4,'shop');
+  assert.equal(game.score(game.S.you).shopPts,17);
+});
+test('industry scores 1 per 2 employed citizens with six jobs per tile',()=>{
+  scoringTown(); tile(0,0,'industrial');
+  tile(6,0,'house'); tile(6,2,'house'); tile(6,4,'apartment');
+  const s=game.score(game.S.you);
+  assert.equal(s.jobs,6); assert.equal(s.citizens,8);
+  assert.equal(s.housePts,2);
+  assert.equal(s.employedCitizens,6); assert.equal(s.industryPts,3);
+});
+test('hospital activates at 10 citizens and no longer changes nearby homes',()=>{
+  scoringTown(); tile(3,3,'hospital');
+  [[2,2],[2,3],[2,4],[3,2]].forEach(([r,c])=>tile(r,c,'house'));
+  let s=game.score(game.S.you);
+  assert.equal(s.citizens,8); assert.equal(s.hospitalPts,0);
+  assert.equal(s.housePts,4);
+  tile(4,2,'house'); s=game.score(game.S.you);
+  assert.equal(s.citizens,10); assert.equal(s.hospitalPts,8);
+  assert.equal(s.housePts,5);
+});
+test('school and sports centre residential bonuses remain unchanged',()=>{
+  scoringTown(); tile(3,3,'house'); tile(1,1,'school'); tile(0,3,'sports');
+  assert.equal(game.score(game.S.you).housePts,7);
+});
 for(const size of [7,9]) test(`complete seeded ${size}×${size} game reaches a natural ending`,()=>{
   game.newGame(size);
   let turns=0;

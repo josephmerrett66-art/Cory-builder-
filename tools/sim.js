@@ -1,14 +1,15 @@
 const fs = require('fs');
 const vm = require('vm');
+const path = require('path');
 
-const src = fs.readFileSync('/home/claude/work/dusk-town.html', 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const script = src.match(/<script>([\s\S]*)<\/script>/)[1];
 
 function fakeEl(){
   const el = {
     dataset: {},
     innerHTML:'', textContent:'', title:'', type:'', className:'', disabled:false, open:false,
-    style:{ cssText:'' },
+    style:{ cssText:'', setProperty(){} },
     classList:{ add(){}, remove(){}, toggle(){} },
     addEventListener(){}, setAttribute(){}, appendChild(){},
     querySelector(){ return fakeEl(); },
@@ -26,7 +27,7 @@ const doc = {
 const ctx = {
   document: doc,
   window: { addEventListener(){}, visualViewport:{ addEventListener(){} } },
-  setTimeout(){},          // stop the bot auto-chaining; we drive it manually
+  setTimeout(){}, clearTimeout(){}, // stop the bot auto-chaining; we drive it manually
   console,
   Math, JSON, Object, Array, String, Number, Boolean, Error, isNaN, parseInt, parseFloat
 };

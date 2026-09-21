@@ -1181,8 +1181,7 @@ function openEnds(own){
 }
 
 /* ===================== scoring ===================== */
-/* A house is scored against its own town only.
-   employed = the town has factory capacity for it (see score) */
+/* Residential tiles are scored against their own town only. */
 /* a school only teaches if industry isn't breathing down its neck */
 function hasActiveSchool(r,c,own){
   for(var y=Math.max(0,r-2);y<=Math.min(SIZE-1,r+2);y++){
@@ -1194,17 +1193,12 @@ function hasActiveSchool(r,c,own){
   }
   return false;
 }
-function houseScore(r,c,own,employed){
-  /* base 0: a home with no amenities and no work earns nothing */
-  var p=0, plus=[], minus=[];
-  if(near(r,c,2,"park",own)){ p+=2; plus.push("+2 park"); }
-  if(near(r,c,2,"shop",own)){ p+=2; plus.push("+2 shop"); }
-  if(employed){ p+=2; plus.push("+2 job"); }
+function houseScore(r,c,own){
+  var p=1, plus=["+1 residential base"], minus=[];
+  if(near(r,c,1,"park",own)){ p+=1; plus.push("+1 park"); }
   if(near(r,c,3,"sports",own)){ p+=3; plus.push("+3 sports centre"); }
   if(hasActiveSchool(r,c,own)){ p+=3; plus.push("+3 school"); }
-  if(near(r,c,4,"hospital",own)){ p+=3; plus.push("+3 hospital"); }
   if(near(r,c,2,"industrial",own)){ p-=3; minus.push("\u22123 industry within 2"); }
-  if(near(r,c,1,"hospital",own)){ p-=3; minus.push("\u22123 hospital within 1"); }
   return {points:Math.max(0,p),plus:plus,minus:minus};
 }
 /* a house holds 2 citizens, an apartment 4; each factory has 6 jobs.
@@ -1225,12 +1219,13 @@ function employedSet(own){
   homes.forEach(function(h){
     if(left>=h.need){ set[h.key]=true; left-=h.need; n++; }
   });
-  return {set:set, jobs:jobs, citizens:citizens, houses:homes.length, employed:n};
+  return {set:set, jobs:jobs, citizens:citizens, houses:homes.length, employed:n,
+          employedCitizens:Math.min(jobs,citizens)};
 }
 /* Apartments hold four citizens and score double — but only where the
    amenities exist to support that density. */
-function homeScore(r,c,own,employed){
-  var base=houseScore(r,c,own,employed);
+function homeScore(r,c,own){
+  var base=houseScore(r,c,own);
   var q=S.grid[r][c];
   if(!q||q.type!=="apartment") return base;
   var nb=nbTypes(r,c,own);
@@ -1239,17 +1234,64 @@ function homeScore(r,c,own,employed){
   }
   return {points:base.points*2, plus:base.plus.concat(["\u00d72 apartment"]), minus:base.minus};
 }
+var SHOP_GROUP_POINTS=[0,0,2,7,12];
+function shopGroupPoints(size){
+  /* Four was the largest playtest group specified. Larger districts keep the
+     same +5 marginal value instead of becoming worse when another shop joins. */
+  return size<SHOP_GROUP_POINTS.length ? SHOP_GROUP_POINTS[size] : 12+(size-4)*5;
+}
+function shopDistrictAt(r,c,own){
+  var q=at(r,c);
+  if(!q||q.type!=="shop"||q.owner!==own) return {size:0,points:0};
+  var seen={}, stack=[[r,c]], size=0;
+  while(stack.length){
+    var here=stack.pop(), key=here[0]+","+here[1];
+    if(seen[key]) continue;
+    seen[key]=1; size++;
+    for(var i=0;i<DIRS.length;i++){
+      var y=here[0]+DIRS[i].dr, x=here[1]+DIRS[i].dc, nb=at(y,x);
+      if(nb&&nb.type==="shop"&&nb.owner===own&&!seen[y+","+x]) stack.push([y,x]);
+    }
+  }
+  return {size:size,points:shopGroupPoints(size)};
+}
+function shopScore(own){
+  var seen={}, points=0, groups=[];
+  each(function(r,c,q){
+    var start=r+","+c;
+    if(!q||q.type!=="shop"||q.owner!==own||seen[start]) return;
+    var stack=[[r,c]], size=0;
+    while(stack.length){
+      var here=stack.pop(), key=here[0]+","+here[1];
+      if(seen[key]) continue;
+      seen[key]=1; size++;
+      for(var i=0;i<DIRS.length;i++){
+        var y=here[0]+DIRS[i].dr, x=here[1]+DIRS[i].dc, nb=at(y,x);
+        if(nb&&nb.type==="shop"&&nb.owner===own&&!seen[y+","+x]) stack.push([y,x]);
+      }
+    }
+    groups.push(size); points+=shopGroupPoints(size);
+  });
+  return {points:points,groups:groups};
+}
 function score(P){
   var emp=employedSet(P.owner);
   var houses=0, housePts=0;
   each(function(r,c,q){
     if(q&&isHome(q.type)&&q.owner===P.owner){
       houses++;
-      housePts+=homeScore(r,c,P.owner,!!emp.set[r+","+c]).points;
+      housePts+=homeScore(r,c,P.owner).points;
     }
   });
-  return {houses:houses,housePts:housePts,total:housePts,
-          employed:emp.employed,jobs:emp.jobs,citizens:emp.citizens};
+  var shops=shopScore(P.owner);
+  var industryPts=Math.floor(emp.employedCitizens/2);
+  var hospitalActive=emp.citizens>=10;
+  var hospitalPts=hospitalActive ? countOwned(P.owner,"hospital")*8 : 0;
+  return {houses:houses,housePts:housePts,shopPts:shops.points,shopGroups:shops.groups,
+          industryPts:industryPts,hospitalPts:hospitalPts,hospitalActive:hospitalActive,
+          total:housePts+shops.points+industryPts+hospitalPts,
+          employed:emp.employed,employedCitizens:emp.employedCitizens,
+          jobs:emp.jobs,citizens:emp.citizens};
 }
 
 /* ===================== game state ===================== */
@@ -1353,7 +1395,7 @@ function marketWant(P,type){
   if(isCivic(type)) return 6;                            /* rare and always useful */
 
   if(type==="industrial"){
-    /* one factory covers four citizens; chase the shortfall, don't stockpile */
+    /* one factory covers six citizens; chase the shortfall, don't stockpile */
     return 1.6 + Math.min(shortfall,12)*0.45 - held("industrial")*1.6;
   }
   if(type==="park"||type==="shop"){
@@ -1383,10 +1425,10 @@ function servablePlots(r,c,own,d){
 /* how far each tile type reaches, for judging what it will serve later */
 /* only amenities gain from reaching empty ground; civics are better judged
    on the homes that already exist near them */
-var REACH={park:2, shop:2};
+var REACH={park:1};
 function bestPlacement(P,forcePlants,strict){
   var b0=score(P);
-  var beforeCore=b0.housePts;
+  var beforeCore=b0.total;
   var best=null;
   var tilesLeft=S.deck.length+S.market.length;
   var stillPlaying=(tilesLeft>0||P.hand.length>1);
@@ -1409,7 +1451,7 @@ function bestPlacement(P,forcePlants,strict){
           var savedOrder=P.order;
           putTile(P,probe,masks[mi],r,c);
           var a1=score(P);
-          var gain=a1.housePts-beforeCore;
+          var gain=a1.total-beforeCore;
           var plots=openPlots(P.owner);
           var ends=openEnds(P.owner);
           clearTile(probe.type,r,c);
@@ -1539,16 +1581,19 @@ function finish(){
   var a=score(S.you), b=score(S.bot);
   function block(label,f){
     var h='<div class="scoreline"><span style="color:var(--ink)"><b>'+label+'</b></span><span>'+f.total+'</span></div>';
-    h+='<div class="scoreline"><span>'+f.houses+' home'+(f.houses===1?'':'s')+'</span><span>'+f.housePts+'</span></div>';
+    h+='<div class="scoreline"><span>Residential</span><span>'+f.housePts+'</span></div>'+
+       '<div class="scoreline"><span>Shopping districts</span><span>'+f.shopPts+'</span></div>'+
+       '<div class="scoreline"><span>Employment</span><span>'+f.industryPts+'</span></div>'+
+       '<div class="scoreline"><span>Hospital</span><span>'+f.hospitalPts+'</span></div>';
     return h+'<div style="height:12px"></div>';
   }
   document.getElementById("overtitle").textContent =
     a.total>b.total?"You win":a.total<b.total?"Ada wins":"A dead heat";
   var avg=a.houses?(a.housePts/a.houses):0;
-  var best=0, emp=employedSet("you");
+  var best=0;
   each(function(r,c,q){
     if(q&&isHome(q.type)&&q.owner==="you"){
-      var hp=homeScore(r,c,"you",!!emp.set[r+","+c]).points;
+      var hp=homeScore(r,c,"you").points;
       if(hp>best) best=hp;
     }
   });
@@ -1683,7 +1728,10 @@ function render(prefix){
   vy.classList.toggle("behind",a.total<bs.total);
   vb.classList.toggle("behind",bs.total<a.total);
   var enough=a.jobs>=a.citizens;
-  var bd='<div class="scoreline"><span>Your homes ('+a.houses+')</span><span>'+a.housePts+'</span></div>'+
+  var bd='<div class="scoreline"><span>Residential ('+a.houses+')</span><span>'+a.housePts+'</span></div>'+
+         '<div class="scoreline"><span>Shopping districts</span><span>'+a.shopPts+'</span></div>'+
+         '<div class="scoreline"><span>Employment</span><span>'+a.industryPts+'</span></div>'+
+         '<div class="scoreline '+(a.hospitalActive?'good':'warn')+'"><span>Hospital</span><span>'+a.hospitalPts+'</span></div>'+
          '<div class="scoreline '+(enough?'good':'warn')+'"><span>Jobs for people</span><span>'+
            a.jobs+' / '+a.citizens+'</span></div>';
   document.getElementById("breakdown").innerHTML=bd;
@@ -1703,16 +1751,16 @@ function render(prefix){
     var mine=iq.owner==="you";
     var whose=mine?"Yours":"Ada's";
     if(isHome(iq.type)){
-      var empi=employedSet(iq.owner);
-      var hs=homeScore(S.inspect.r,S.inspect.c,iq.owner,!!empi.set[S.inspect.r+","+S.inspect.c]);
+      var hs=homeScore(S.inspect.r,S.inspect.c,iq.owner);
       msg="<b>"+NAMES[iq.type]+" ("+whose+") \u2014 "+hs.points+"</b><br>"+
-          ["0 base"].concat(hs.plus,hs.minus).join(" \u00b7 ");
+          hs.plus.concat(hs.minus).join(" \u00b7 ");
     } else if(isRoad(iq.type)){
       msg="<b>"+NAMES[iq.type]+" ("+whose+", "+(SHAPE_NAME[iq.mask]||"junction")+")</b><br>"+
           (mine?"Your road. Buildings may touch it.":"Ada's road. You cannot build off it.");
     } else if(iq.type==="industrial"){
+      var inds=score(iq.owner==="you"?S.you:S.bot);
       msg="<b>Industrial ("+whose+")</b><br>"+
-          (mine?"6 jobs, any distance. \u22123 to your houses within 2."
+          (mine?"6 jobs, any distance. Employment is worth +1 per 2 employed citizens ("+inds.industryPts+" now). \u22123 to your homes within 2."
                :"Ada's. No effect on your houses.");
     } else if(iq.type==="sports"){
       msg="<b>Sports centre ("+whose+")</b><br>"+
@@ -1725,15 +1773,17 @@ function render(prefix){
                      :"+3 to your houses within 2.")
                :"Ada's. No effect on your houses.");
     } else if(iq.type==="hospital"){
+      var hosp=score(iq.owner==="you"?S.you:S.bot);
       msg="<b>Hospital ("+whose+")</b><br>"+
-          (mine?"+3 to your houses within 4. \u22123 within 1."
+          (mine?(hosp.hospitalActive?"Active: 10+ citizens. Worth 8 points.":hosp.citizens+" / 10 citizens. Worth 0 points.")
                :"Ada's. No effect on your houses.");
     } else if(iq.type==="park"){
       msg="<b>Park ("+whose+")</b><br>"+
-          (mine?"+2 to your houses within 2.":"Ada's. No effect on your houses.");
+          (mine?"+1 to your homes within 1.":"Ada's. No effect on your houses.");
     } else {
+      var district=shopDistrictAt(S.inspect.r,S.inspect.c,iq.owner);
       msg="<b>Shop ("+whose+")</b><br>"+
-          (mine?"+2 to your houses within 2.":"Ada's. No effect on your houses.");
+          (mine?district.size+" orthogonally connected shop"+(district.size===1?"":"s")+". District worth "+district.points+" points.":"Ada's. Only orthogonally connected shops in the same town form a district.");
     }
   } else if(item){
     msg += item.type==="road"
@@ -1756,31 +1806,27 @@ function render(prefix){
 /* ===================== legend ===================== */
 (function(){
   var rows=[
-    ["house",0,0,"House","2 citizens. Starts at <b>0</b>, then:<br>"+
-      "<b>+2</b> park within 2<br>"+
-      "<b>+2</b> shop within 2<br>"+
-      "<b>+2</b> has a job<br>"+
+    ["house",0,0,"House","2 citizens. Worth <b>1</b> point, then:<br>"+
+      "<b>+1</b> park within 1<br>"+
       "<b>+3</b> sports centre within 3<br>"+
       "<b>+3</b> school within 2<br>"+
-      "<b>+3</b> hospital within 4<br>"+
       "<b>\u22123</b> industry within 2<br>"+
-      "<b>\u22123</b> hospital within 1<br>"+
       "Never below 0."],
     ["apartment",0,0,"Apartment block","4 citizens, so it needs 4 jobs.<br>"+
       "Scores <b>double</b> whatever a house on that tile would score.<br>"+
       "<b>0</b> unless a park <i>and</i> a shop are directly next to it."],
-    ["park",0,0,"Park","<b>+2</b> to each of your houses within 2."],
-    ["shop",0,0,"Shop","<b>+2</b> to each of your houses within 2."],
+    ["park",0,0,"Park","<b>+1</b> to each of your homes within 1."],
+    ["shop",0,0,"Shop","Orthogonal districts: 1 / 2 / 3 / 4 shops score <b>0 / 2 / 7 / 12</b>. Each extra shop adds 5."],
     ["industrial",0,0,"Industrial","<b>6 jobs</b>, at any distance.<br>"+
       "A house needs 2, an apartment 4 \u2014 one factory covers three houses.<br>"+
-      "<b>\u22123</b> to each of your houses within 2."],
+      "<b>+1</b> per 2 employed citizens. <b>\u22123</b> to each home within 2."],
     ["sports",0,0,"Sports centre","<b>+3</b> to each of your houses within 3.<br>Occupies 2\u00d72. One per player."],
     ["school",0,0,"School","<b>+3</b> to each of your houses within 2.<br>Gives nothing if any industry is within 2 of it. One per player."],
-    ["hospital",0,0,"Hospital","<b>+3</b> to each of your houses within 4.<br><b>\u22123</b> to each of your houses within 1. One per player."],
+    ["hospital",0,0,"Hospital","<b>0</b> below 10 citizens; <b>8</b> at 10+ citizens. One per player."],
     ["road",7,0,"Road","No points. Every building must touch one of your roads.<br>Where two of your roads meet, the open ends must match."]
   ];
   document.getElementById("legend").innerHTML=
-    '<p class="note">Distance is measured as a square. \u201cWithin 2\u201d means the 5\u00d75 block around the tile \u2014 diagonals count the same as straight neighbours. Only your own tiles count.</p>'+
+    '<p class="note">Distance is measured as a square, with diagonals included. Connected shops must share an edge. Only your own tiles count.</p>'+
     rows.map(function(row){
       var svg=sprite(row[0],row[1],row[2]);
       if(row[0]==="apartment") svg=svg.replace("<svg ","<svg class=\"tall\" ");

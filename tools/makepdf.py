@@ -1,10 +1,12 @@
 import json
+from pathlib import Path
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor
 
-deck=json.load(open('/home/claude/deck.json'))
+ROOT=Path(__file__).resolve().parent.parent
+deck=json.load(open(ROOT/'tmp/pdfs/deck.json'))
 TILE=30.0; MARGIN=8.0; CUT=0.25
 W,H = A4[0]/mm, A4[1]/mm
 COLS = int((W-2*MARGIN)//TILE)
@@ -33,7 +35,7 @@ for r in rows:
     cur.append(r); used+=r['h']
 if cur: pages.append(cur)
 
-c=canvas.Canvas('/mnt/user-data/outputs/dusk-town-tiles-A4.pdf',pagesize=A4)
+c=canvas.Canvas(str(ROOT/'print/tiles-A4.pdf'),pagesize=A4)
 c.setTitle("Dusk Town tiles")
 for pi,page in enumerate(pages):
     gh=sum(r['h'] for r in page); gw=COLS*TILE

@@ -1,10 +1,12 @@
 import json
+from pathlib import Path
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor
 
-icons=json.load(open('/home/claude/icons.json'))
+ROOT=Path(__file__).resolve().parent.parent
+icons=json.load(open(ROOT/'tmp/pdfs/icons.json'))
 W,H = A4[0]/mm, A4[1]/mm       # 210 x 297
 CW,CH = 194.0, 132.0           # two landscape cards stacked, cut across the middle
 INK=HexColor("#111315"); SOFT=HexColor("#5a6068"); LINE=HexColor("#b9bdc2")
@@ -18,25 +20,25 @@ def icon(c,name,x,y,size):
     c.rect(x*mm,y*mm,size*mm,size*mm,stroke=1,fill=0)
 
 COL1=[
- ("house","HOUSE","2 citizens \u00b7 starts at 0",
-  ["+2  park within 2","+2  shop within 2","+2  has a job",
-   "+3  sports centre within 3","+3  school within 2","+3  hospital within 4",
-   "\u22123  industry within 2","\u22123  hospital within 1","never below 0"]),
+ ("house","HOUSE","2 citizens \u00b7 1 point",
+  ["+1  park within 1","+3  sports centre within 3",
+   "+3  school within 2","\u22123  industry within 2","never below 0"]),
  ("apartment","APARTMENT","4 citizens",
   ["double a house on that tile","0 unless a park AND a shop",
    "are directly next to it"]),
  ("industrial","INDUSTRIAL","6 jobs, any distance",
-  ["house needs 2 \u00b7 apartment 4","one factory covers 3 houses",
+  ["house needs 2 \u00b7 apartment 4","+1 per 2 employed citizens",
    "\u22123 to your homes within 2"]),
 ]
 COL2=[
- ("park","PARK","", ["+2 to your homes within 2"]),
- ("shop","SHOP","", ["+2 to your homes within 2"]),
+ ("park","PARK","", ["+1 to your homes within 1"]),
+ ("shop","SHOP","edge-connected districts",
+  ["1 / 2 / 3 / 4 shops: 0 / 2 / 7 / 12","each extra shop: +5"]),
  ("sports","SPORTS CENTRE","2x2 \u00b7 one each", ["+3 to your homes within 3"]),
  ("school","SCHOOL","one each",
   ["+3 to your homes within 2","nothing if industry within 2 of it"]),
  ("hospital","HOSPITAL","one each",
-  ["+3 to your homes within 4","\u22123 to your homes within 1"]),
+  ["below 10 citizens: 0 points","10+ citizens: 8 points"]),
  ("road","ROAD","no points",
   ["buildings must touch your road","where your roads meet, ends match"]),
 ]
@@ -67,7 +69,7 @@ def card(c,ox,oy):
     c.setFillColor(INK); c.setFont("Helvetica-Bold",12)
     c.drawString(x*mm,y*mm,"DUSK TOWN")
     c.setFont("Helvetica",7.4); c.setFillColor(SOFT)
-    c.drawString((x+34)*mm,y*mm,"Only homes score, and only your own. Add them up at the end.")
+    c.drawString((x+34)*mm,y*mm,"Score residences, shop districts, employment, and your hospital.")
     y-=4.6
     c.drawString(x*mm,y*mm,'Distance is a square \u2014 "within 2" is the 5\u00d75 block around a tile, diagonals included.')
     y-=3.8
@@ -79,7 +81,7 @@ def card(c,ox,oy):
     column(c,COL1,x,y)
     column(c,COL2,x+98,y)
 
-c=canvas.Canvas('/mnt/user-data/outputs/dusk-town-score-cards-A4.pdf',pagesize=A4)
+c=canvas.Canvas(str(ROOT/'print/reference-cards-A4.pdf'),pagesize=A4)
 c.setTitle("Dusk Town reference cards")
 gap=(H-2*CH)/3
 card(c,(W-CW)/2, gap*2+CH)

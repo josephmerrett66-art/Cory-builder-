@@ -1,6 +1,10 @@
 const {load}=require('./stub');
 const fs=require('fs');
-const ctx=load('/home/claude/work/dusk-town.html');
+const path=require('path');
+const root=path.join(__dirname,'..');
+const outDir=path.join(root,'tmp','pdfs');
+fs.mkdirSync(outDir,{recursive:true});
+const ctx=load(path.join(root,'index.html'));
 function runs(grid){
   const out=[];
   grid.forEach((row,y)=>{
@@ -23,5 +27,5 @@ const set={
 };
 const out={};
 for(const k in set){ out[k]={w:set[k][0].length,h:set[k].length,runs:runs(set[k])}; }
-fs.writeFileSync('/home/claude/icons.json',JSON.stringify(out));
+fs.writeFileSync(path.join(outDir,'icons.json'),JSON.stringify(out));
 console.log('icons exported:',Object.keys(out).join(', '));
