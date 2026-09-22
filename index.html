@@ -120,6 +120,10 @@
     background:var(--verge);display:block;position:relative;cursor:default;
   }
   .cell svg{display:block;width:100%;height:100%}
+  .pixel-sprite{
+    display:block;image-rendering:pixelated;image-rendering:crisp-edges;
+    shape-rendering:crispEdges;
+  }
   .illustrated-sprite{
     display:block;width:100%;height:100%;position:relative;overflow:hidden;
     object-fit:cover;
@@ -451,7 +455,12 @@ function grassSprite(v){
   var tufts=2+Math.floor(R()*2);
   for(i=0;i<tufts;i++){
     var tx=1+Math.floor(R()*30), ty=1+Math.floor(R()*30);
-    if(g[ty][tx]==="g"){ g[ty][tx]="I"; if(tx+1<32&&g[ty][tx+1]==="g") g[ty][tx+1]="G"; }
+    if(g[ty][tx]==="g"){
+      g[ty][tx]="I";
+      if(tx>0&&g[ty][tx-1]==="g") g[ty][tx-1]="G";
+      if(tx+1<32&&g[ty][tx+1]==="g") g[ty][tx+1]="G";
+      if(ty>0&&g[ty-1][tx]==="g") g[ty-1][tx]="L";
+    }
   }
   return g;
 }
@@ -470,14 +479,22 @@ function houseSprite(v){
     for(var i=0;i<Math.floor(w/2);i++){ px(g,x+i,y,hi); }
     px(g,x,y,"i"); px(g,x+w-1,y,"i");
   }
+  /* small staggered shingles give the roof texture without muddying its shape */
+  for(var ry=7;ry<=12;ry+=2){
+    for(var rx=8+(ry%4);rx<25;rx+=4){
+      if(g[ry][rx]===main||g[ry][rx]===hi) px(g,rx,ry,lo);
+    }
+  }
   rect(g,3,13,26,1,lo); px(g,3,13,"i"); px(g,28,13,"i");
   rect(g,15,5,2,8,lo);                       /* ridge line down the roof */
   /* walls */
-  rect(g,6,14,20,13,wall); rect(g,6,25,20,2,wsh); frame(g,6,14,20,13,"i");
+  rect(g,6,14,20,13,wall); rect(g,7,15,18,1,"S");
+  rect(g,6,25,20,2,wsh); frame(g,6,14,20,13,"i");
   /* windows with sills */
   [9,18].forEach(function(wx){
     frame(g,wx,17,5,5,"l"); rect(g,wx+1,18,3,3,"y");
-    px(g,wx+2,18,"Y"); rect(g,wx-1,22,7,1,"C");
+    px(g,wx+1,18,"Y"); px(g,wx+3,20,"w"); rect(g,wx-1,22,7,1,"C");
+    px(g,wx,22,"p"); px(g,wx+4,22,"P");
   });
   /* door and step */
   frame(g,14,20,5,7,"l"); rect(g,15,21,3,6,"d"); px(g,17,24,"Y");
@@ -491,9 +508,10 @@ function houseSprite(v){
 }
 function upgradeSprite(){
   var g=houseSprite(0);
-  /* a bold renovation marker remains readable on a small printed counter */
-  rect(g,2,2,11,11,"o"); frame(g,2,2,11,11,"i");
-  rect(g,6,4,3,7,"S"); rect(g,4,6,7,3,"S");
+  /* an upward build marker is distinct from the hospital's medical cross */
+  rect(g,2,2,11,11,"U"); frame(g,2,2,11,11,"i");
+  rect(g,6,6,3,5,"y"); rect(g,4,6,7,2,"y");
+  rect(g,5,4,5,2,"y"); px(g,7,3,"Y");
   return g;
 }
 function parkSprite(v){
@@ -508,6 +526,8 @@ function parkSprite(v){
   blob(g,22,21,8,6,"V");
   blob(g,22,21,7,5,"W","B",null);
   px(g,18,19,"B"); px(g,26,25,"B");
+  rect(g,20,18,4,1,"B"); rect(g,24,22,3,1,"V");
+  px(g,20,22,"H"); px(g,21,22,"F"); px(g,25,19,"H");
   for(i=0;i<5;i++){ px(g,15+i*3,17-(i%2),"F"); }
   px(g,29,17,"F"); px(g,30,19,"F"); px(g,17,26,"F");
   tree(g,7,9,5);
@@ -534,6 +554,7 @@ function playgroundSprite(){
   for(i=0;i<4;i++){ rect(g,26,13+i*2,4,1,"M"); }
   rect(g,24,10,7,2,"r"); frame(g,24,10,7,2,"i");
   for(i=0;i<7;i++){ px(g,23-i,12+i,"M"); px(g,22-i,12+i,"K"); }
+  px(g,22,13,"w"); px(g,19,16,"w");
   /* roundabout */
   blob(g,8,25,4,3,"M"); blob(g,8,25,2,1,"K"); px(g,8,25,"l");
   /* sandpit */
@@ -552,6 +573,7 @@ function skateparkSprite(){
   rect(g,2,7,28,21,"v");
   frame(g,2,7,28,21,"n");
   for(i=0;i<18;i++){ px(g,3+((i*7)%26), 8+((i*5)%19), "n"); }
+  rect(g,3,8,26,1,"m"); px(g,28,9,"m");
   /* bowl, sunk into the pad */
   blob(g,10,18,7,6,"K");
   blob(g,10,18,5,4,"n");
@@ -589,7 +611,7 @@ function gardenSprite(){
   /* fountain in the middle */
   blob(g,16,16,4,3,"M");
   blob(g,16,16,3,2,"W","B",null);
-  px(g,16,15,"S"); px(g,16,14,"S");
+  px(g,16,15,"S"); px(g,16,14,"S"); px(g,15,16,"B");
   /* clipped topiary in the gaps between beds, clear of the path */
   [[16,6],[16,26],[5,16],[27,16]].forEach(function(t){
     blob(g,t[0],t[1],2,2,"F");
@@ -628,6 +650,7 @@ function shopSprite(v){
   rect(g,4,17,23,9,"w");
   rect(g,4,17,23,1,"l");
   rect(g,12,17,1,9,"l"); rect(g,20,17,1,9,"l");
+  px(g,5,18,"S"); px(g,6,18,"S"); px(g,14,19,"S"); px(g,22,18,"S");
   rect(g,21,18,5,3,"y"); px(g,23,19,"Y");
   rect(g,21,22,5,1,"l");                    /* display shelf */
   rect(g,21,23,2,2,"P"); rect(g,24,23,2,2,"p");
@@ -649,6 +672,7 @@ function shopSprite(v){
 
   /* pavement, kerb, A-board and a bin */
   rect(g,1,28,30,3,"v"); rect(g,1,31,30,1,"n");
+  for(x=3;x<30;x+=6){ px(g,x,29,"n"); }
   rect(g,4,27,4,4,"S"); frame(g,4,27,4,4,"i"); rect(g,5,28,2,1,"l"); px(g,5,30,"l");
   rect(g,25,26,3,3,"K"); frame(g,25,26,3,3,"i"); rect(g,25,26,3,1,"M");
   px(g,22,30,"Q"); px(g,11,30,"Q");
@@ -664,6 +688,10 @@ function industrialSprite(v){
   rect(g,18,9,3,7,"K"); frame(g,18,9,3,7,"i");
   /* shed */
   rect(g,2,14,28,14,"k"); frame(g,2,14,28,14,"i");
+  /* restrained brick courses and rivets keep the factory readable, not noisy */
+  for(var by=19;by<27;by+=3){
+    for(var bx2=3+(by%2)*2;bx2<29;bx2+=6){ if(g[by][bx2]==="k") px(g,bx2,by,"K"); }
+  }
   if(v===0){
     for(var s=0;s<4;s++){
       var bx=2+s*7;
@@ -674,6 +702,7 @@ function industrialSprite(v){
     rect(g,2,14,28,4,"K"); rect(g,3,15,26,1,"M"); rect(g,3,17,26,1,"i");
   }
   for(var n=0;n<4;n++){ frame(g,4+n*7,20,5,4,"l"); rect(g,5+n*7,21,3,2,"y"); }
+  [5,12,19,26].forEach(function(wx){ px(g,wx,21,"Y"); });
   /* roller door and loading bay */
   frame(g,12,23,8,5,"i");
   for(var m=24;m<27;m++){ rect(g,13,m,6,1,m%2?"M":"K"); }
@@ -700,6 +729,7 @@ function powerSprite(){
     rect(g,cx-4,topY,9,1,"K");
   }
   tower(8,6); tower(21,5);
+  px(g,7,9,"M"); px(g,20,8,"M");
   /* turbine hall */
   rect(g,2,20,28,8,"K"); frame(g,2,20,28,8,"i");
   rect(g,2,20,28,1,"M");
@@ -719,6 +749,7 @@ function waterSprite(){
     px(g,cx,cy,"M");
   }
   tank(9,9,7); tank(23,19,7);
+  px(g,6,6,"S"); px(g,20,16,"S");
   /* pipe run between the tanks */
   rect(g,8,16,3,4,"M"); rect(g,8,19,12,3,"M"); frame(g,8,19,12,3,"K");
   px(g,11,17,"K"); px(g,13,20,"K"); px(g,17,20,"K");
@@ -771,15 +802,20 @@ function apartmentSprite(v){
       var wx=7+i*5, wy=10+j*4;
       tframe(g,wx,wy,4,3,"l");
       trect(g,wx+1,wy+1,2,1, R()>0.42 ? "y" : "D");
+      if((i+j)%3===0) tpx(g,wx+1,wy+1,"Y");
     }
   }
   /* balcony rails every other floor */
-  for(j=1;j<8;j+=2){ trect(g,6,12+j*4,20,1,"M"); }
+  for(j=1;j<8;j+=2){
+    trect(g,6,12+j*4,20,1,"M");
+    for(i=7;i<26;i+=4) tpx(g,i,11+j*4,"K");
+  }
   /* roof slab, stair housing, water tank and aerial */
   trect(g,4,5,24,3,"K"); tframe(g,4,5,24,3,"i");
   trect(g,8,1,6,4,"K"); tframe(g,8,1,6,4,"i");
   trect(g,19,2,5,3,"M"); tframe(g,19,2,5,3,"i");
   trect(g,21,0,1,2,"i");
+  tpx(g,22,0,"m"); tpx(g,4,39,"S"); tpx(g,27,39,"C");
   return g;
 }
 
@@ -792,17 +828,20 @@ function schoolSprite(){
   rect(g,13,2,6,4,"S"); frame(g,13,2,6,4,"i");
   px(g,16,3,"i"); px(g,16,4,"i"); px(g,17,4,"i");
   rect(g,11,7,10,1,"R");
+  px(g,13,3,"y"); px(g,18,3,"y");
   /* main block */
   rect(g,2,8,28,19,"x"); rect(g,2,25,28,2,"X"); frame(g,2,8,28,19,"i");
   rect(g,2,6,28,3,"R"); frame(g,2,6,28,3,"i"); rect(g,2,6,28,1,"t");
   [4,11,18,25].forEach(function(x){
-    frame(g,x,12,5,5,"l"); rect(g,x+1,13,3,3,"y"); px(g,x+2,13,"Y");
+    frame(g,x,12,5,5,"l"); rect(g,x+1,13,3,3,"y");
+    px(g,x+1,13,"Y"); px(g,x+3,15,"w");
   });
   frame(g,13,19,6,8,"l"); rect(g,14,20,4,7,"d"); px(g,17,23,"Y");
   rect(g,13,27,6,1,"q"); rect(g,15,27,2,5,"q");
   /* playground markings and a flag */
   rect(g,3,28,8,3,"v"); frame(g,4,29,6,1,"S");
   rect(g,26,1,1,7,"b"); rect(g,27,1,4,3,"p");
+  px(g,27,1,"P"); px(g,9,30,"n");
   return g;
 }
 function hospitalSprite(){
@@ -810,15 +849,20 @@ function hospitalSprite(){
   groundShadow(g,16,29,15);
   rect(g,2,7,28,20,"c"); rect(g,2,25,28,2,"C"); frame(g,2,7,28,20,"i");
   rect(g,2,5,28,3,"v"); frame(g,2,5,28,3,"i"); rect(g,2,5,28,1,"M");
+  rect(g,6,3,4,2,"M"); frame(g,6,3,4,2,"i");
+  rect(g,24,2,3,3,"K"); frame(g,24,2,3,3,"i");
   /* red cross on the gable */
   rect(g,15,9,3,9,"r"); rect(g,12,12,9,3,"r"); frame(g,12,9,9,9,"i");
   [4,24].forEach(function(x){
     frame(g,x,10,5,5,"l"); rect(g,x+1,11,3,3,"y");
+    px(g,x+1,11,"Y"); px(g,x+3,13,"w");
     frame(g,x,17,5,5,"l"); rect(g,x+1,18,3,3,"y");
+    px(g,x+1,18,"Y");
   });
   /* ambulance bay */
   rect(g,11,20,11,7,"v"); frame(g,11,20,11,7,"i");
   rect(g,13,22,7,4,"w"); px(g,16,23,"Y");
+  rect(g,12,19,9,2,"u"); px(g,12,19,"J");
   rect(g,1,27,30,3,"v"); rect(g,1,30,30,1,"n");
   rect(g,3,28,5,2,"S"); px(g,4,28,"r"); px(g,6,29,"r");
   return g;
@@ -832,6 +876,7 @@ function sportsBig(){
   /* running track and infield */
   bblob(g,32,27,28,20,"n");
   bblob(g,32,27,27,19,"o");
+  bblob(g,32,27,25,17,"r");
   bblob(g,32,27,23,15,"F");
   bblob(g,32,27,22,14,"f");
   /* pitch markings */
@@ -839,6 +884,9 @@ function sportsBig(){
   brect(g,32,18,1,19,"S");
   bblob(g,32,27,4,3,"S"); bblob(g,32,27,2,1,"f");
   bframe(g,20,23,4,9,"S"); bframe(g,41,23,4,9,"S");
+  /* goals and corner flags survive the four-way tile split */
+  brect(g,19,25,1,5,"S"); brect(g,45,25,1,5,"S");
+  [[20,18],[44,18],[20,36],[44,36]].forEach(function(f){ bpx(g,f[0],f[1],"P"); });
   /* main stand */
   brect(g,6,44,52,11,"K"); brect(g,6,44,52,3,"M");
   bframe(g,6,44,52,11,"i");
@@ -902,6 +950,12 @@ function roadSprite(mask){
       if(q[0]>=0&&q[0]<SZ&&q[1]>=0&&q[1]<SZ&&g[q[0]][q[1]]==="a"){ g[q[0]][q[1]]="n"; }
     });
   });
+  /* mottled asphalt and hairline repairs add depth without obscuring exits */
+  var roadR=rnd(mask*43+19);
+  for(i=0;i<24;i++){
+    var ax=Math.floor(roadR()*SZ), ay=Math.floor(roadR()*SZ);
+    if(g[ay][ax]==="a") g[ay][ax]=roadR()>.72?"K":"a";
+  }
   /* paving slabs, so the footpath doesn't read as flat grey */
   var R=rnd(mask*29+7);
   for(i=0;i<26;i++){
@@ -988,6 +1042,11 @@ function roadSprite(mask){
 
   /* centre of a crossroads stays clear of paint */
   if(arms.length===4){ rect(g,14,14,4,4,"a"); }
+  /* storm drains sit beside the carriageway, reinforcing the road silhouette */
+  if(mask&N){ rect(g,10,3,1,4,"K"); }
+  if(mask&Sd){ rect(g,21,25,1,4,"K"); }
+  if(mask&E){ rect(g,25,10,4,1,"K"); }
+  if(mask&Wd){ rect(g,3,21,4,1,"K"); }
   return g;
 }
 
@@ -995,7 +1054,7 @@ function roadSprite(mask){
 var cache={};
 function toSvg(g){
   var h=g.length, wdt=g[0].length;
-  var out='<svg viewBox="0 0 '+wdt+' '+h+'" shape-rendering="crispEdges" aria-hidden="true">';
+  var out='<svg class="pixel-sprite" viewBox="0 0 '+wdt+' '+h+'" shape-rendering="crispEdges" aria-hidden="true">';
   for(var y=0;y<h;y++){
     var row=g[y], w=row.length, x=0;
     while(x<w){
@@ -1047,7 +1106,8 @@ function artSprite(type,mask,variant,whole){
 function sprite(type,mask,variant,whole){
   variant=variant||0;
   if(type==="upgrade"){
-    var homeArt=ART_STYLE==="illustrated" ? artSprite("house",0,variant,whole) : toSvg(upgradeSprite());
+    if(ART_STYLE!=="illustrated") return toSvg(upgradeSprite());
+    var homeArt=artSprite("house",0,variant,whole);
     return '<span class="upgrade-card-art" aria-hidden="true">'+homeArt+'<i class="upgrade-mark">+</i></span>';
   }
   if(ART_STYLE==="illustrated") return artSprite(type,mask,variant,whole);
