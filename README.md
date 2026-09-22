@@ -38,6 +38,11 @@ factory covers three houses. Distance is irrelevant — people commute. Every
 2 employed citizens score **1 point**, so a fully used factory can contribute
 up to 3 employment points.
 
+**House upgrade tiles** are placed directly on one of your existing houses,
+rather than on an empty plot. An upgraded house gains **2 residential points**
+and holds **3 citizens** instead of 2, so it also needs one additional job.
+Each house can be upgraded once. Placing an upgrade costs one normal half-turn.
+
 **Apartment blocks** hold four citizens and need four jobs. They score double
 whatever a house would score on that tile — but nothing at all unless a park
 *and* a shop sit directly next to them. They are drawn taller than their tile

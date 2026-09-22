@@ -6,7 +6,7 @@ square tile should be exactly 30mm.
 
 300 gsm matte card.
 
-## tiles-A4.pdf — 3 sheets, 136 pieces
+## tiles-A4.pdf — 3 sheets, 144 pieces
 
 | | |
 |---|---|
@@ -18,6 +18,7 @@ square tile should be exactly 30mm.
 | Sports centre | 2 (60 x 60mm, covers 2x2) |
 | School | 2 |
 | Hospital | 2 |
+| House upgrade | 8 |
 | Road | 60 |
 | Starting tile | 2 |
 

@@ -122,24 +122,11 @@
   .cell svg{display:block;width:100%;height:100%}
   .illustrated-sprite{
     display:block;width:100%;height:100%;position:relative;overflow:hidden;
-    background-image:url("assets/illustrated-tiles.png");
-    background-size:400% 400%;background-position:var(--ax,0%) var(--ay,0%);
-    background-repeat:no-repeat;
   }
-  .illustrated-sprite.art-sports{background-size:800% 800%}
-  .illustrated-road{background-position:0 0}
-  .road-arm,.road-core{position:absolute;display:block;background:#74716a;z-index:1}
-  .road-core{left:33%;top:33%;width:34%;height:34%;box-shadow:inset 0 0 0 2px #c4b17f}
-  .road-arm.n,.road-arm.s{
-    left:33%;width:34%;height:52%;
-    background:linear-gradient(90deg,#c4b17f 0 8%,#74716a 8% 45%,#f1e7c9 45% 55%,#74716a 55% 92%,#c4b17f 92%);
+  .illustrated-road-art{shape-rendering:geometricPrecision}
+  .cell.tall svg.illustrated-sprite,.tile.tall svg.illustrated-sprite{
+    position:relative;left:auto;bottom:auto;width:100%;height:100%;
   }
-  .road-arm.n{top:-1%}.road-arm.s{bottom:-1%}
-  .road-arm.e,.road-arm.w{
-    top:33%;height:34%;width:52%;
-    background:linear-gradient(0deg,#c4b17f 0 8%,#74716a 8% 45%,#f1e7c9 45% 55%,#74716a 55% 92%,#c4b17f 92%);
-  }
-  .road-arm.e{right:-1%}.road-arm.w{left:-1%}
   .cell.own-you::before,.cell.own-bot::before{
     content:"";position:absolute;top:0;right:0;
     border-top:7px solid var(--gold);border-left:7px solid transparent;
@@ -173,6 +160,15 @@
   }
   .tile svg{display:block;width:100%;height:100%}
   .tile .illustrated-sprite{display:block;width:100%;height:100%}
+  .upgrade-card-art{display:block;position:relative;width:100%;height:100%;overflow:hidden}
+  .upgrade-card-art>svg,.upgrade-card-art>.illustrated-sprite{display:block;width:100%;height:100%}
+  .upgrade-mark{
+    position:absolute;left:3px;top:3px;z-index:8;display:grid;place-items:center;
+    width:15px;height:15px;border:2px solid #fff4d3;background:#b56b32;color:#fff;
+    font:700 11px/1 ui-sans-serif,sans-serif;box-shadow:1px 1px 0 rgba(0,0,0,.65);
+    pointer-events:none;
+  }
+  :root:not([data-art="illustrated"]) .upgrade-mark{border-radius:0;background:#e0655a}
   .tile.tall{overflow:visible}
   .tile.tall svg{position:absolute;left:0;bottom:0;height:150%}
   .tile[disabled]{opacity:.35;cursor:not-allowed}
@@ -490,6 +486,13 @@ function houseSprite(v){
   tree(g,6,24,3);
   px(g,25,29,"p"); px(g,27,30,"P"); px(g,23,31,"p"); px(g,29,28,"P");
   fenceRun(g,2,31,28);
+  return g;
+}
+function upgradeSprite(){
+  var g=houseSprite(0);
+  /* a bold renovation marker remains readable on a small printed counter */
+  rect(g,2,2,11,11,"o"); frame(g,2,2,11,11,"i");
+  rect(g,6,4,3,7,"S"); rect(g,4,6,7,3,"S");
   return g;
 }
 function parkSprite(v){
@@ -1004,36 +1007,83 @@ function toSvg(g){
   return out+'</svg>';
 }
 
+/* Use an SVG viewport rather than CSS background-position. This keeps every
+   atlas crop on exact tile boundaries at all responsive sizes, so a neighbour
+   can never bleed through the top or bottom of a square. */
+function atlasCrop(col,row,scale,extraClass){
+  scale=scale||4;
+  return '<svg class="illustrated-sprite '+(extraClass||'')+'" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
+    '<image href="assets/illustrated-tiles.png" x="'+(-col*100)+'" y="'+(-row*100)+'" width="'+(scale*100)+'" height="'+(scale*100)+'" preserveAspectRatio="none"/>'+
+    '</svg>';
+}
+
+function illustratedRoad(mask){
+  var arms=[];
+  if(mask&N) arms.push({x:32,y:-2,w:36,h:54,sx:39,sy:-2,sw:22,sh:54,dir:"v"});
+  if(mask&E) arms.push({x:48,y:32,w:54,h:36,sx:48,sy:39,sw:54,sh:22,dir:"h"});
+  if(mask&Sd) arms.push({x:32,y:48,w:36,h:54,sx:39,sy:48,sw:22,sh:54,dir:"v"});
+  if(mask&Wd) arms.push({x:-2,y:32,w:54,h:36,sx:-2,sy:39,sw:54,sh:22,dir:"h"});
+  var shoulder='<rect x="32" y="32" width="36" height="36" rx="5"/>';
+  var surface='<rect x="39" y="39" width="22" height="22" rx="2"/>';
+  var kerbs='', marks='';
+  arms.forEach(function(a){
+    shoulder+='<rect x="'+a.x+'" y="'+a.y+'" width="'+a.w+'" height="'+a.h+'"/>';
+    surface+='<rect x="'+a.sx+'" y="'+a.sy+'" width="'+a.sw+'" height="'+a.sh+'"/>';
+    if(a.dir==="v"){
+      kerbs+='<line x1="37" y1="'+a.y+'" x2="37" y2="'+(a.y+a.h)+'"/><line x1="63" y1="'+a.y+'" x2="63" y2="'+(a.y+a.h)+'"/>';
+    }else{
+      kerbs+='<line x1="'+a.x+'" y1="37" x2="'+(a.x+a.w)+'" y2="37"/><line x1="'+a.x+'" y1="63" x2="'+(a.x+a.w)+'" y2="63"/>';
+    }
+  });
+  var count=arms.length;
+  if(mask===(N|Sd)) marks='<line x1="50" y1="-2" x2="50" y2="102"/>';
+  else if(mask===(E|Wd)) marks='<line x1="-2" y1="50" x2="102" y2="50"/>';
+  else {
+    if(mask&N) marks+='<line x1="50" y1="-2" x2="50" y2="38"/>';
+    if(mask&E) marks+='<line x1="62" y1="50" x2="102" y2="50"/>';
+    if(mask&Sd) marks+='<line x1="50" y1="62" x2="50" y2="102"/>';
+    if(mask&Wd) marks+='<line x1="-2" y1="50" x2="38" y2="50"/>';
+  }
+  var junction=count>=3
+    ? '<path d="M40 34h20 M66 40v20 M60 66H40 M34 60V40" fill="none" stroke="#f2e7c8" stroke-width="1.8" opacity=".9"/>'
+    : '';
+  return '<svg class="illustrated-sprite illustrated-road-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
+    '<image href="assets/illustrated-tiles.png" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>'+
+    '<g fill="#c8aa76" stroke="#9a7a50" stroke-width="1.2">'+shoulder+'</g>'+
+    '<g fill="#686b66" stroke="#4b4e4a" stroke-width="1">'+surface+'</g>'+
+    '<g fill="none" stroke="#ead7ab" stroke-width="1.5" opacity=".95">'+kerbs+'</g>'+
+    '<g fill="none" stroke="#f5e7b6" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="5 5" opacity=".92">'+marks+'</g>'+junction+
+    '<g fill="#4b4e4a" opacity=".2"><circle cx="43" cy="44" r="1.1"/><circle cx="57" cy="55" r=".8"/><circle cx="47" cy="59" r=".7"/></g>'+
+    '</svg>';
+}
+
 function artSprite(type,mask,variant,whole){
   variant=variant||0;
-  if(type==="road"||type==="entrance"){
-    var arms="";
-    if(mask&N) arms+='<i class="road-arm n"></i>';
-    if(mask&E) arms+='<i class="road-arm e"></i>';
-    if(mask&Sd) arms+='<i class="road-arm s"></i>';
-    if(mask&Wd) arms+='<i class="road-arm w"></i>';
-    return '<span class="illustrated-sprite illustrated-road" aria-hidden="true"><i class="road-core"></i>'+arms+'</span>';
-  }
+  if(type==="road"||type==="entrance") return illustratedRoad(mask);
   if(type==="sports"){
-    if(whole) return '<span class="illustrated-sprite" style="--ax:33.3333%;--ay:100%" aria-hidden="true"></span>';
-    var part=variant||0, sx=(2+(part%2))/7*100, sy=(6+Math.floor(part/2))/7*100;
-    return '<span class="illustrated-sprite art-sports" style="--ax:'+sx+'%;--ay:'+sy+'%" aria-hidden="true"></span>';
+    if(whole) return atlasCrop(1,3,4,'art-sports-whole');
+    var part=variant||0;
+    return atlasCrop(2+(part%2),6+Math.floor(part/2),8,'art-sports');
   }
   var positions={
-    apartment:[100,0], industrial:[66.6667,66.6667], school:[100,66.6667],
-    hospital:[0,100], power:[66.6667,66.6667], water:[0,33.3333]
+    apartment:[3,0], industrial:[2,2], school:[3,2],
+    hospital:[0,3], power:[2,2], water:[0,1]
   };
   var pos;
-  if(type==="grass") pos=[[0,0],[66.6667,100],[100,100]][variant%3];
-  else if(type==="house") pos=variant%2?[66.6667,0]:[33.3333,0];
-  else if(type==="park") pos=[[0,33.3333],[33.3333,33.3333],[100,33.3333],[66.6667,33.3333]][variant%4];
-  else if(type==="shop") pos=variant%2?[33.3333,66.6667]:[0,66.6667];
+  if(type==="grass") pos=[[0,0],[2,3],[3,3]][variant%3];
+  else if(type==="house") pos=variant%2?[2,0]:[1,0];
+  else if(type==="park") pos=[[0,1],[1,1],[3,1],[2,1]][variant%4];
+  else if(type==="shop") pos=variant%2?[1,2]:[0,2];
   else pos=positions[type]||[0,0];
-  return '<span class="illustrated-sprite'+(type==="apartment"?' tall':'')+'" style="--ax:'+pos[0]+'%;--ay:'+pos[1]+'%" aria-hidden="true"></span>';
+  return atlasCrop(pos[0],pos[1],4,type==="apartment"?'art-apartment':'');
 }
 
 function sprite(type,mask,variant,whole){
   variant=variant||0;
+  if(type==="upgrade"){
+    var homeArt=ART_STYLE==="illustrated" ? artSprite("house",0,variant,whole) : toSvg(upgradeSprite());
+    return '<span class="upgrade-card-art" aria-hidden="true">'+homeArt+'<i class="upgrade-mark">+</i></span>';
+  }
   if(ART_STYLE==="illustrated") return artSprite(type,mask,variant,whole);
   var key=type+":"+mask+":"+variant+":"+(whole?1:0);
   if(cache[key]) return cache[key];
@@ -1061,11 +1111,14 @@ var YOU_GATE, BOT_GATE;
 var botTimer=null;
 var NAMES={road:"Road",entrance:"Highway entrance",house:"House",park:"Park",
            shop:"Shop",industrial:"Industrial",apartment:"Apartment block",power:"Power plant",water:"Water plant",
-           school:"School",hospital:"Hospital",sports:"Sports centre"};
+           school:"School",hospital:"Hospital",sports:"Sports centre",upgrade:"House upgrade"};
 var CIVIC_TYPES=["sports","school","hospital"];
 function isCivic(t){ return CIVIC_TYPES.indexOf(t)>=0; }
 function isHome(t){ return t==="house"||t==="apartment"; }
-function residents(t){ return t==="apartment"?4:2; }
+function residents(tile){
+  var t=typeof tile==="string"?tile:tile.type;
+  return t==="apartment"?4:(tile&&tile.upgraded?3:2);
+}
 function civicStack(){
   var a=[];
   /* one of each per player */
@@ -1076,6 +1129,7 @@ var SHAPE_NAME={5:"straight",10:"straight",3:"corner",6:"corner",12:"corner",9:"
                 7:"T-junction",14:"T-junction",13:"T-junction",11:"T-junction",15:"crossroads"};
 var BANDS={house:[18,23],apartment:[5,8],park:[10,15],shop:[10,15],industrial:[11,16]};
 var DECK_SIZE=68;
+var UPGRADE_COUNT=8;
 var MARKET_SIZE=3;
 var GRASS_VARIANTS=12;
 function roadStack(){
@@ -1119,12 +1173,14 @@ function buildDeck(){
     for(j=0;j<types.length;j++){ for(k=0;k<counts[types[j]];k++){ deck.push(types[j]); } }
     /* the civics ride along in the same deck, so they surface when they surface */
     civicStack().forEach(function(t){ deck.push(t); });
+    for(k=0;k<UPGRADE_COUNT;k++) deck.push("upgrade");
     return shuffle(deck);
   }
   var fb=[];
   for(i=0;i<24;i++) fb.push("house");
   for(i=0;i<13;i++){ fb.push("park"); fb.push("shop"); }
   for(i=0;i<14;i++) fb.push("industrial");
+  for(i=0;i<UPGRADE_COUNT;i++) fb.push("upgrade");
   return shuffle(fb);
 }
 
@@ -1179,6 +1235,10 @@ function legalBuilding(r,c,own){
   }
   return false;
 }
+function legalUpgrade(r,c,own){
+  var q=at(r,c);
+  return !!q&&q.type==="house"&&q.owner===own&&!q.upgraded;
+}
 /* the sports centre covers a 2x2 block; everything else is a single square */
 function cellsFor(type,r,c){
   if(type==="sports"){
@@ -1201,9 +1261,16 @@ function legalSports(r,c,own){
 function legalFor(item,r,c,own){
   if(item.type==="road") return legalRoad(r,c,item.mask,own);
   if(item.type==="sports") return legalSports(r,c,own);
+  if(item.type==="upgrade") return legalUpgrade(r,c,own);
   return legalBuilding(r,c,own);
 }
 function putTile(P,item,mask,r,c){
+  if(item.type==="upgrade"){
+    P.order++;
+    S.grid[r][c].upgraded=true;
+    S.grid[r][c].upgradeOrder=P.order;
+    return;
+  }
   var cells=cellsFor(item.type,r,c);
   P.order++;
   for(var i=0;i<cells.length;i++){
@@ -1214,6 +1281,11 @@ function putTile(P,item,mask,r,c){
   }
 }
 function clearTile(type,r,c){
+  if(type==="upgrade"){
+    delete S.grid[r][c].upgraded;
+    delete S.grid[r][c].upgradeOrder;
+    return;
+  }
   var cells=cellsFor(type,r,c);
   for(var i=0;i<cells.length;i++){ S.grid[cells[i][0]][cells[i][1]]=null; }
 }
@@ -1311,6 +1383,8 @@ function schoolCoverage(r,c,own){
 }
 function houseScore(r,c,own){
   var p=1, plus=["+1 residential base"], minus=[];
+  var home=at(r,c);
+  if(home&&home.type==="house"&&home.upgraded){ p+=2; plus.push("+2 house upgrade"); }
   if(near(r,c,1,"park",own)){ p+=1; plus.push("+1 park"); }
   if(near(r,c,3,"sports",own)){ p+=3; plus.push("+3 sports centre"); }
   var school=schoolCoverage(r,c,own);
@@ -1327,7 +1401,7 @@ function employedSet(own){
   var homes=[], citizens=0;
   each(function(r,c,q){
     if(q&&isHome(q.type)&&q.owner===own){
-      var need=residents(q.type);
+      var need=residents(q);
       homes.push({key:r+","+c, need:need});
       citizens+=need;
     }
@@ -1511,6 +1585,11 @@ function marketWant(P,type){
   function held(t){ return P.hand.filter(function(i){ return i.type===t; }).length; }
 
   if(isCivic(type)) return 6;                            /* rare and always useful */
+  if(type==="upgrade"){
+    var targets=0;
+    each(function(r,c,q){ if(q&&q.type==="house"&&q.owner===own&&!q.upgraded) targets++; });
+    return targets ? 4.4+Math.min(targets,4)*0.35-held("upgrade")*1.8 : -4;
+  }
 
   if(type==="industrial"){
     /* one factory covers six citizens; chase the shortfall, don't stockpile */
@@ -1564,7 +1643,7 @@ function bestPlacement(P,forcePlants,strict){
         for(var c=0;c<SIZE;c++){
           var probe={type:item.type,mask:masks[mi],v:item.v};
           if(!legalFor(probe,r,c,P.owner)) continue;
-          var sealsEnd=(probe.type!=="road")&&isEndCell(r,c,P.owner);
+          var sealsEnd=(probe.type!=="road"&&probe.type!=="upgrade")&&isEndCell(r,c,P.owner);
           if(strict&&stillPlaying&&sealsEnd) continue;
           var savedOrder=P.order;
           putTile(P,probe,masks[mi],r,c);
@@ -1756,13 +1835,13 @@ function paintBoard(){
   for(var r=0;r<SIZE;r++){
     for(var c=0;c<SIZE;c++,i++){
       var b=cellEls[i], q=S.grid[r][c];
-      var sig = ART_STYLE+":"+(q ? q.type+":"+q.mask+":"+q.v+":"+q.owner : "grass:"+S.land[r][c]);
+      var sig = ART_STYLE+":"+(q ? q.type+":"+q.mask+":"+q.v+":"+q.owner+":"+(q.upgraded?1:0) : "grass:"+S.land[r][c]);
       var tall = !!q && q.type==="apartment";
       if(b.dataset.sig!==sig){
-        b.innerHTML = q ? sprite(q.type,q.mask,q.v) : sprite("grass",0,S.land[r][c]);
+        b.innerHTML = q ? sprite(q.type,q.mask,q.v)+(q.upgraded?'<i class="upgrade-mark">+</i>':'') : sprite("grass",0,S.land[r][c]);
         b.dataset.sig=sig;
         b.setAttribute("aria-label", q
-          ? (q.owner==="you"?"Your ":"Ada's ")+NAMES[q.type]+" row "+(r+1)+" column "+(c+1)
+          ? (q.owner==="you"?"Your ":"Ada's ")+(q.upgraded?"upgraded ":"")+NAMES[q.type]+" row "+(r+1)+" column "+(c+1)
           : "Empty plot row "+(r+1)+" column "+(c+1));
       }
       var legal=item?legalFor(item,r,c,"you"):false;
@@ -1871,7 +1950,8 @@ function render(prefix){
     if(isHome(iq.type)){
       var hs=homeScore(S.inspect.r,S.inspect.c,iq.owner);
       msg="<b>"+NAMES[iq.type]+" ("+whose+") \u2014 "+hs.points+"</b><br>"+
-          hs.plus.concat(hs.minus).join(" \u00b7 ");
+          hs.plus.concat(hs.minus).join(" \u00b7 ")+
+          (iq.upgraded?"<br>Upgraded: 3 citizens and +2 residential points.":"");
     } else if(isRoad(iq.type)){
       msg="<b>"+NAMES[iq.type]+" ("+whose+", "+(SHAPE_NAME[iq.mask]||"junction")+")</b><br>"+
           (mine?"Your road. Buildings may touch it.":"Ada's road. You cannot build off it.");
@@ -1906,6 +1986,8 @@ function render(prefix){
   } else if(item){
     msg += item.type==="road"
       ? "Rotate to match the ends, then tap a marked plot."
+      : item.type==="upgrade"
+      ? "Tap one of your marked houses to upgrade it."
       : "Tap a marked plot.";
   } else if(S.mode==="take"){ msg+="Taking. One more tile, or end turn.";
   } else if(S.mode==="place"){ msg+="Placing. One more tile, or end turn.";
@@ -1941,6 +2023,7 @@ function renderLegend(){
     ["sports",0,0,"Sports centre","<b>+3</b> to each of your houses within 3.<br>Occupies 2\u00d72. One per player."],
     ["school",0,0,"School","Homes within 2 get <b>+3</b>; homes outside all active catchments get <b>\u22121</b>.<br>Catchments never stack. Gives nothing if industry is within 2. One per player."],
     ["hospital",0,0,"Hospital","<b>0</b> below 10 citizens; <b>8</b> at 10+ citizens. One per player."],
+    ["upgrade",0,0,"House upgrade","Place on one of your houses. It gains <b>+2</b> residential points and holds <b>3 citizens</b> instead of 2.<br>Each house can be upgraded once."],
     ["road",7,0,"Road","No points. Every building must touch one of your roads.<br>Where two of your roads meet, the open ends must match."]
   ];
   document.getElementById("legend").innerHTML=

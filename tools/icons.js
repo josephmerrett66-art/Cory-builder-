@@ -23,6 +23,7 @@ const set={
   house:ctx.houseSprite(0), apartment:ctx.apartmentSprite(0),
   park:ctx.parkSprite(1), shop:ctx.shopSprite(0), industrial:ctx.industrialSprite(0),
   sports:ctx.sportsSprite(0), school:ctx.schoolSprite(), hospital:ctx.hospitalSprite(),
+  upgrade:ctx.upgradeSprite(),
   road:ctx.roadSprite(7)
 };
 const out={};

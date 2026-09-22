@@ -22,6 +22,7 @@ add(square,'industrial',0,0,8,'Industrial'); add(square,'industrial',0,1,7,'Indu
 // civics (the sports centre covers 2x2, so it prints as one big tile)
 add(square,'school',0,0,2,'School');
 add(square,'hospital',0,0,2,'Hospital');
+add(square,'upgrade',0,0,8,'House upgrade');
 // roads
 add(square,'road',5,0,14,'Road'); add(square,'road',10,0,14,'Road');
 [3,6,12,9].forEach(m=>add(square,'road',m,0,4,'Road'));
@@ -58,6 +59,7 @@ function gridFor(t){
   if(t.type==='hospital') return ctx.hospitalSprite();
   if(t.type==='sports') return ctx.sportsSprite(t.variant);
   if(t.type==='apartment') return ctx.apartmentSprite(t.variant);
+  if(t.type==='upgrade') return ctx.upgradeSprite();
 }
 function pack(list){
   return list.map(t=>{

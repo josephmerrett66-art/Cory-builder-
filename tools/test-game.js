@@ -117,6 +117,25 @@ test('houses score 1 base and parks add 1 only within one square',()=>{
   game.S.grid[2][2]=null; tile(1,1,'park');
   assert.equal(game.score(game.S.you).housePts,1);
 });
+test('house upgrades target only an owner\'s plain house',()=>{
+  scoringTown(); tile(3,3,'house'); tile(3,4,'house','bot'); tile(4,3,'apartment');
+  const up={type:'upgrade',mask:0};
+  assert.equal(game.legalFor(up,3,3,'you'),true);
+  assert.equal(game.legalFor(up,3,4,'you'),false);
+  assert.equal(game.legalFor(up,4,3,'you'),false);
+  game.putTile(game.S.you,up,0,3,3);
+  assert.equal(game.legalFor(up,3,3,'you'),false);
+});
+test('an upgraded house gains 2 points and one citizen',()=>{
+  scoringTown(); tile(3,3,'house');
+  const before=game.score(game.S.you);
+  game.putTile(game.S.you,{type:'upgrade',mask:0},0,3,3);
+  const after=game.score(game.S.you);
+  assert.equal(after.housePts,before.housePts+2);
+  assert.equal(after.citizens,before.citizens+1);
+  assert.equal(game.S.grid[3][3].type,'house');
+  assert.equal(game.S.grid[3][3].upgraded,true);
+});
 test('apartments stay at 0 until an adjacent park and shop activate double scoring',()=>{
   scoringTown(); tile(3,3,'apartment');
   tile(3,2,'park'); assert.equal(game.score(game.S.you).housePts,0);

@@ -29,6 +29,8 @@ COL1=[
  ("industrial","INDUSTRIAL","6 jobs, any distance",
   ["house needs 2 \u00b7 apartment 4","+1 per 2 employed citizens",
    "\u22123 to your homes within 2"]),
+ ("upgrade","HOUSE UPGRADE","place on your house",
+  ["+2 residential points \u00b7 3 citizens","one upgrade per house"]),
 ]
 COL2=[
  ("park","PARK","", ["+1 to your homes within 1"]),
