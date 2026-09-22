@@ -6,6 +6,10 @@ square tile should be exactly 30mm.
 
 300 gsm matte card.
 
+The standalone 6 x 4 inch player scoring card is generated at
+`output/pdf/scoring-index-card.pdf`. It summarises every final-scoring category
+and includes writable subtotal and total boxes.
+
 ## tiles-A4.pdf — 3 sheets, 144 pieces
 
 | | |
@@ -38,6 +42,7 @@ structure.
     node tools/deck.js      # fixed deck -> deck.json
     node tools/icons.js     # card icons -> icons.json
     python3 tools/makepdf.py
+    python3 tools/makescorecard.py
     python3 tools/makecards.py
 
 The generators read the sprites straight out of `index.html`, so the printed
