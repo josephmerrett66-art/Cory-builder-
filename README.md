@@ -6,8 +6,10 @@ Open `index.html` in a browser. No build step, no dependencies — one self-cont
 
 Use the **Art** setting in the header to switch between the new warm illustrated
 tabletop tiles and the original pixel art. The choice is saved in the browser.
-The illustrated theme uses the generated atlas in `assets/illustrated-tiles.png`;
-roads remain code-drawn so their connections are always exact.
+The illustrated theme uses individually cropped artwork in `assets/illustrated/`
+so every image stays inside its tile at any screen size. Roads use generated
+straight, corner, T-junction and crossroads artwork; rotations keep all road
+connections exact.
 
 ## The game
 

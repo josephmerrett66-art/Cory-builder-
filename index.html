@@ -122,8 +122,9 @@
   .cell svg{display:block;width:100%;height:100%}
   .illustrated-sprite{
     display:block;width:100%;height:100%;position:relative;overflow:hidden;
+    object-fit:cover;
   }
-  .illustrated-road-art{shape-rendering:geometricPrecision}
+  .illustrated-road-art{transform:rotate(var(--road-rotation,0deg))}
   .cell.tall svg.illustrated-sprite,.tile.tall svg.illustrated-sprite{
     position:relative;left:auto;bottom:auto;width:100%;height:100%;
   }
@@ -1007,75 +1008,40 @@ function toSvg(g){
   return out+'</svg>';
 }
 
-/* Use an SVG viewport rather than CSS background-position. This keeps every
-   atlas crop on exact tile boundaries at all responsive sizes, so a neighbour
-   can never bleed through the top or bottom of a square. */
-function atlasCrop(col,row,scale,extraClass){
-  scale=scale||4;
-  return '<svg class="illustrated-sprite '+(extraClass||'')+'" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
-    '<image href="assets/illustrated-tiles.png" x="'+(-col*100)+'" y="'+(-row*100)+'" width="'+(scale*100)+'" height="'+(scale*100)+'" preserveAspectRatio="none"/>'+
-    '</svg>';
-}
-
 function illustratedRoad(mask){
-  var arms=[];
-  if(mask&N) arms.push({x:32,y:-2,w:36,h:54,sx:39,sy:-2,sw:22,sh:54,dir:"v"});
-  if(mask&E) arms.push({x:48,y:32,w:54,h:36,sx:48,sy:39,sw:54,sh:22,dir:"h"});
-  if(mask&Sd) arms.push({x:32,y:48,w:36,h:54,sx:39,sy:48,sw:22,sh:54,dir:"v"});
-  if(mask&Wd) arms.push({x:-2,y:32,w:54,h:36,sx:-2,sy:39,sw:54,sh:22,dir:"h"});
-  var shoulder='<rect x="32" y="32" width="36" height="36" rx="5"/>';
-  var surface='<rect x="39" y="39" width="22" height="22" rx="2"/>';
-  var kerbs='', marks='';
-  arms.forEach(function(a){
-    shoulder+='<rect x="'+a.x+'" y="'+a.y+'" width="'+a.w+'" height="'+a.h+'"/>';
-    surface+='<rect x="'+a.sx+'" y="'+a.sy+'" width="'+a.sw+'" height="'+a.sh+'"/>';
-    if(a.dir==="v"){
-      kerbs+='<line x1="37" y1="'+a.y+'" x2="37" y2="'+(a.y+a.h)+'"/><line x1="63" y1="'+a.y+'" x2="63" y2="'+(a.y+a.h)+'"/>';
-    }else{
-      kerbs+='<line x1="'+a.x+'" y1="37" x2="'+(a.x+a.w)+'" y2="37"/><line x1="'+a.x+'" y1="63" x2="'+(a.x+a.w)+'" y2="63"/>';
-    }
-  });
-  var count=arms.length;
-  if(mask===(N|Sd)) marks='<line x1="50" y1="-2" x2="50" y2="102"/>';
-  else if(mask===(E|Wd)) marks='<line x1="-2" y1="50" x2="102" y2="50"/>';
-  else {
-    if(mask&N) marks+='<line x1="50" y1="-2" x2="50" y2="38"/>';
-    if(mask&E) marks+='<line x1="62" y1="50" x2="102" y2="50"/>';
-    if(mask&Sd) marks+='<line x1="50" y1="62" x2="50" y2="102"/>';
-    if(mask&Wd) marks+='<line x1="-2" y1="50" x2="38" y2="50"/>';
-  }
-  var junction=count>=3
-    ? '<path d="M40 34h20 M66 40v20 M60 66H40 M34 60V40" fill="none" stroke="#f2e7c8" stroke-width="1.8" opacity=".9"/>'
-    : '';
-  return '<svg class="illustrated-sprite illustrated-road-art" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'+
-    '<image href="assets/illustrated-tiles.png" x="0" y="0" width="400" height="400" preserveAspectRatio="none"/>'+
-    '<g fill="#c8aa76" stroke="#9a7a50" stroke-width="1.2">'+shoulder+'</g>'+
-    '<g fill="#686b66" stroke="#4b4e4a" stroke-width="1">'+surface+'</g>'+
-    '<g fill="none" stroke="#ead7ab" stroke-width="1.5" opacity=".95">'+kerbs+'</g>'+
-    '<g fill="none" stroke="#f5e7b6" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="5 5" opacity=".92">'+marks+'</g>'+junction+
-    '<g fill="#4b4e4a" opacity=".2"><circle cx="43" cy="44" r="1.1"/><circle cx="57" cy="55" r=".8"/><circle cx="47" cy="59" r=".7"/></g>'+
-    '</svg>';
+  var file,rotation=0;
+  if(mask===(N|Sd)) file="road-straight";
+  else if(mask===(E|Wd)){ file="road-straight"; rotation=90; }
+  else if(mask===3) file="road-corner";
+  else if(mask===6){ file="road-corner"; rotation=90; }
+  else if(mask===12){ file="road-corner"; rotation=180; }
+  else if(mask===9){ file="road-corner"; rotation=270; }
+  else if(mask===7) file="road-t";
+  else if(mask===14){ file="road-t"; rotation=90; }
+  else if(mask===13){ file="road-t"; rotation=180; }
+  else if(mask===11){ file="road-t"; rotation=270; }
+  else file="road-cross";
+  return '<img class="illustrated-sprite illustrated-road-art" src="assets/illustrated/'+file+'.png" style="--road-rotation:'+rotation+'deg" alt="" aria-hidden="true">';
 }
 
 function artSprite(type,mask,variant,whole){
   variant=variant||0;
   if(type==="road"||type==="entrance") return illustratedRoad(mask);
   if(type==="sports"){
-    if(whole) return atlasCrop(1,3,4,'art-sports-whole');
-    var part=variant||0;
-    return atlasCrop(2+(part%2),6+Math.floor(part/2),8,'art-sports');
+    var sportsFile=whole ? "sports" : "sports-"+(variant||0);
+    return '<img class="illustrated-sprite" src="assets/illustrated/'+sportsFile+'.png" alt="" aria-hidden="true">';
   }
-  var positions={
-    apartment:[3,0], industrial:[2,2], school:[3,2],
-    hospital:[0,3], power:[2,2], water:[0,1]
+  var files={
+    apartment:"apartment",industrial:"industrial",school:"school",
+    hospital:"hospital",power:"industrial",water:"park-0"
   };
-  var pos;
-  if(type==="grass") pos=[[0,0],[2,3],[3,3]][variant%3];
-  else if(type==="house") pos=variant%2?[2,0]:[1,0];
-  else if(type==="park") pos=[[0,1],[1,1],[3,1],[2,1]][variant%4];
-  else if(type==="shop") pos=variant%2?[1,2]:[0,2];
-  else pos=positions[type]||[0,0];
-  return atlasCrop(pos[0],pos[1],4,type==="apartment"?'art-apartment':'');
+  var file;
+  if(type==="grass") file="grass-"+(variant%3);
+  else if(type==="house") file="house-"+(variant%2);
+  else if(type==="park") file="park-"+(variant%4);
+  else if(type==="shop") file="shop-"+(variant%2);
+  else file=files[type]||"grass-0";
+  return '<img class="illustrated-sprite'+(type==="apartment"?' art-apartment':'')+'" src="assets/illustrated/'+file+'.png" alt="" aria-hidden="true">';
 }
 
 function sprite(type,mask,variant,whole){
