@@ -1,9 +1,10 @@
 // shared browser stub for the test harnesses
 const fs=require('fs'), vm=require('vm');
 function fakeEl(){
+  const properties={};
   return {dataset:{},clientWidth:390,innerHTML:'',textContent:'',title:'',type:'',
     className:'',disabled:false,open:false,
-    style:{cssText:'',setProperty(){},getPropertyValue(){return '';}},
+    style:{cssText:'',setProperty(key,value){properties[key]=String(value);},getPropertyValue(key){return properties[key]||'';}},
     classList:{add(){},remove(){},toggle(){}},addEventListener(){},setAttribute(){},
     appendChild(){},querySelector(){return fakeEl();},
     showModal(){this.open=true;},close(){this.open=false;}};
@@ -24,6 +25,8 @@ function load(file, seed){
     setTimeout(){},clearTimeout(){},console,Math:M,JSON,Object,Array,String,Number,Boolean,Error,
     isNaN,parseInt,parseFloat
   };
+  // Match the browser's read-only Window.history, catching accidental globals.
+  Object.defineProperty(ctx,'history',{get(){return {};},configurable:false});
   vm.createContext(ctx); vm.runInContext(script,ctx);
   return ctx;
 }

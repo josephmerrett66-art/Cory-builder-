@@ -224,7 +224,7 @@
   dialog::backdrop{background:rgba(0,0,0,.72)}
   dialog h2{font-family:"Silkscreen",monospace;font-size:15px;margin:0 0 12px}
   .map-info{font-size:12px;color:var(--ink-soft);text-align:center;margin:0}
-  #mapsize{display:block;width:100%;margin:7px 0 14px;padding:10px;
+  #playmode,#gameseed{display:block;width:100%;margin:7px 0 14px;padding:10px;
     background:var(--panel2);color:var(--ink);border:2px solid var(--edge2);font:inherit}
   #setup p{font-size:14px;color:var(--ink-soft)}
   @media (max-width:880px){
@@ -240,6 +240,25 @@
   @media (max-width:380px){
     .tile{width:38px;height:38px}
   }
+
+  .towns{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--bg);padding:6px 0 12px;margin-bottom:10px}
+  .town{border:2px solid var(--edge2);background:var(--panel);padding:9px 12px}
+  .town.active-town{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+  .town .population{font-weight:bold;border-top:1px solid var(--edge2);margin-top:3px}
+  .town .population span{color:var(--ink);font-size:16px}
+  #winrule,.hint{font-size:12px;color:var(--ink-soft)}
+  .tile-info,.placement-preview{font-size:13px;margin-bottom:10px;padding:9px;border:1px solid var(--edge2);background:var(--panel2)}
+  .placement-preview table{border-collapse:collapse;width:100%;margin-top:5px;text-align:left}
+  .placement-preview th,.placement-preview td{padding:3px 6px;border-bottom:1px solid var(--edge2)}
+  .placement-preview p{margin:5px 0}
+  .range-mark{display:none}
+  .cell.in-range .range-mark{display:block;position:absolute;inset:0;z-index:4;pointer-events:none;border:1px solid #e8b956;background:rgba(232,185,86,.24)}
+  .cell.proposed::after{content:"";position:absolute;inset:1px;z-index:6;border:3px solid #fff1a0;background:rgba(237,193,88,.38);pointer-events:none}
+  .cell.legal::after{z-index:5;pointer-events:none}
+  .tilerow:has(.tile.tall){padding-top:23px}
+  details summary{cursor:pointer;font-weight:bold;font-size:13px}
+  #breakdown h3{margin:12px 0 5px;font-size:14px}
+  @media(max-width:420px){.town{padding:6px}.town .scoreline span{font-size:11px}.town .population span{font-size:14px}.topbar{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -253,42 +272,43 @@
           <option value="pixel">Pixel</option>
         </select>
       </label>
-      <div class="scores">
-        <span class="vs-side" id="vsyou"><i class="who">You</i><b class="num">0</b></span>
-        <span class="vs-side" id="vsbot"><i class="who">Ada</i><b class="num">0</b></span>
-      </div>
+      <span id="winrule"></span>
     </div>
   </div>
 
+  <section class="towns" aria-label="Town populations"><div id="town-you" class="town"></div><div id="town-bot" class="town"></div></section>
   <div class="layout">
     <div class="boardcol">
       <div class="board" id="board" role="grid" aria-label="The shared city grid"></div>
       <p class="map-info" id="mapinfo"></p>
 
       <div class="card tight">
-        <div class="status" id="status"></div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+        <div id="tileinfo" class="tile-info" hidden></div>
+        <div id="placementpreview" class="placement-preview" aria-live="polite" hidden></div>
         <div class="acts">
           <button class="act" id="rotate">Rotate &#8635;</button>
-          <button class="act" id="endturn">End turn</button>
+          <button class="act" id="confirm">Confirm placement</button>
+          <button class="act" id="cancelplacement">Cancel selection</button>
+          <button class="act" id="endturn">Pass</button>
+          <button class="act" id="undo">Undo last move</button>
           <button class="act" id="finish" disabled>Results</button>
           <button class="act" id="restart">New game</button>
         </div>
-        <div class="rowlabel">Market</div>
+        <div class="rowlabel" id="marketcount">Shared market</div>
         <div class="tilerow" id="market"></div>
-        <div class="tilerow" id="roadrow" style="margin-top:7px"></div>
-
-        <div class="rowlabel">Your hand</div>
-        <div class="tilerow" id="hand"></div>
+        <div class="rowlabel" id="civiclabel">Unused Civic Tiles</div>
+        <div class="tilerow" id="civics"></div>
+        <p id="hospitalhint" class="hint"></p>
       </div>
     </div>
 
     <div class="panel-col">
+      <details class="card"><summary>Debug town breakdown</summary>
+        <div id="breakdown"></div><button class="act" id="logtown">Log town calculations</button>
+      </details>
       <div class="card">
-        <h2>Your score</h2>
-        <div id="breakdown"></div>
-      </div>
-      <div class="card">
-        <h2>Points</h2>
+        <h2>Rules index</h2>
         <div class="legend" id="legend"></div>
       </div>
     </div>
@@ -296,19 +316,13 @@
 </div>
 
 <dialog id="setup" aria-labelledby="setuptitle">
-  <h2 id="setuptitle">Choose your map</h2>
-  <p>Smaller maps bring your towns together sooner.</p>
-  <label for="mapsize">Map size</label>
-  <select id="mapsize">
-    <option value="7">7 × 7 — Tiny</option>
-    <option value="9">9 × 9 — Small</option>
-    <option value="11">11 × 11 — Medium</option>
-    <option value="13" selected>13 × 13 — Original</option>
-    <option value="15">15 × 15 — Large</option>
-  </select>
-  <p>The tile supply and scoring ranges stay the same on every map.</p>
-  <p>Play until neither player can legally place another tile, including tiles
-    still in the supply. If you cannot build, pass while the other town continues.</p>
+  <h2 id="setuptitle">Start a new town</h2>
+  <p id="setupsummary"></p>
+  <label for="playmode">Players</label>
+  <select id="playmode"><option value="local">Two players · same device</option><option value="bot">You vs Ada</option></select>
+  <label for="gameseed">Game seed (optional)</label>
+  <input id="gameseed" type="text" maxlength="64" placeholder="Leave blank for a new shuffle">
+  <p>Reuse a seed to repeat the same tile supply. Population is the lower of Accommodation and Attraction. Player 2 receives an equal final turn.</p>
   <div class="acts">
     <button class="act" id="startgame">Start game</button>
     <button class="act" id="cancelsetup" hidden>Keep playing</button>
@@ -316,7 +330,7 @@
 </dialog>
 
 <dialog id="over" aria-labelledby="overtitle">
-  <h2 id="overtitle">Final scores</h2>
+  <h2 id="overtitle">Final populations</h2>
   <div id="overbody"></div>
   <div class="acts" style="margin-top:16px">
     <button class="act" id="viewmap">View map</button>
@@ -1105,11 +1119,6 @@ function artSprite(type,mask,variant,whole){
 
 function sprite(type,mask,variant,whole){
   variant=variant||0;
-  if(type==="upgrade"){
-    if(ART_STYLE!=="illustrated") return toSvg(upgradeSprite());
-    var homeArt=artSprite("house",0,variant,whole);
-    return '<span class="upgrade-card-art" aria-hidden="true">'+homeArt+'<i class="upgrade-mark">+</i></span>';
-  }
   if(ART_STYLE==="illustrated") return artSprite(type,mask,variant,whole);
   var key=type+":"+mask+":"+variant+":"+(whole?1:0);
   if(cache[key]) return cache[key];
@@ -1130,1021 +1139,536 @@ function sprite(type,mask,variant,whole){
   return cache[key];
 }
 
-/* ===================== rules ===================== */
-var SIZE=13;
-var MAP_SIZES=[7,9,11,13,15];
-var YOU_GATE, BOT_GATE;
-var botTimer=null;
+/* ===================== balance configuration ===================== */
+var GAME_CONFIG={
+  boardSize:13, marketSize:5, winPopulation:40,
+  distanceMetric:"manhattan", // "chebyshev" restores the older square ranges.
+  houseAccommodation:4, apartmentAccommodation:8, parkAttraction:1,
+  shops:{one:1,two:4,threePlus:8},
+  industryAttraction:4, industryHouseRange:2,
+  schoolAttractionPerHouse:2, schoolRange:3,
+  hospitalPopulationDivisor:2, hospitalMaxAttraction:12,
+  sportsAttractionPerType:2, sportsRange:2, sportsMaxAttraction:12,
+  sportsFootprint:2, // Preserve the existing four-part Sports Ground artwork.
+  normalTiles:{house:21,apartment:6,park:13,shop:13,industrial:15},
+  roadTiles:{5:28,3:16,7:12,15:4}
+};
+var SIZE=GAME_CONFIG.boardSize;
 var NAMES={road:"Road",entrance:"Highway entrance",house:"House",park:"Park",
-           shop:"Shop",industrial:"Industrial",apartment:"Apartment block",power:"Power plant",water:"Water plant",
-           school:"School",hospital:"Hospital",sports:"Sports centre",upgrade:"House upgrade"};
-var CIVIC_TYPES=["sports","school","hospital"];
-function isCivic(t){ return CIVIC_TYPES.indexOf(t)>=0; }
-function isHome(t){ return t==="house"||t==="apartment"; }
-function residents(tile){
-  var t=typeof tile==="string"?tile:tile.type;
-  return t==="apartment"?4:(tile&&tile.upgraded?3:2);
-}
-function civicStack(){
-  var a=[];
-  /* one of each per player */
-  CIVIC_TYPES.forEach(function(t){ a.push(t); a.push(t); });
-  return shuffle(a);
-}
+  shop:"Shop",industrial:"Industry",apartment:"Apartment",school:"School",
+  hospital:"Hospital",sports:"Sports Ground"};
+var CIVIC_TYPES=["school","hospital","sports"];
 var SHAPE_NAME={5:"straight",10:"straight",3:"corner",6:"corner",12:"corner",9:"corner",
-                7:"T-junction",14:"T-junction",13:"T-junction",11:"T-junction",15:"crossroads"};
-var BANDS={house:[18,23],apartment:[5,8],park:[10,15],shop:[10,15],industrial:[11,16]};
-var DECK_SIZE=68;
-var UPGRADE_COUNT=8;
-var MARKET_SIZE=3;
-var GRASS_VARIANTS=12;
-function roadStack(){
-  var a=[];
-  /* straights are the commonest single shape, but a town needs junctions or
-     the network becomes one long corridor that can never widen */
-  [5,10].forEach(function(m){ for(var i=0;i<14;i++) a.push(m); });
-  [3,6,12,9].forEach(function(m){ for(var i=0;i<4;i++) a.push(m); });
-  [7,14,13,11].forEach(function(m){ for(var i=0;i<3;i++) a.push(m); });
-  for(var j=0;j<4;j++) a.push(15);
-  return a;
+  7:"T-intersection",14:"T-intersection",13:"T-intersection",11:"T-intersection",15:"crossroads"};
+var VARIANTS={park:4,house:2,shop:2,industrial:2,apartment:2};
+var DIRS=[{bit:N,dr:-1,dc:0,opp:Sd},{bit:E,dr:0,dc:1,opp:Wd},
+  {bit:Sd,dr:1,dc:0,opp:N},{bit:Wd,dr:0,dc:-1,opp:E}];
+var S,botTimer=null,moveHistory=[],cellEls=null;
+function isCivic(type){return CIVIC_TYPES.indexOf(type)>=0;}
+function isRoad(type){return type==="road"||type==="entrance";}
+function clone(value){return JSON.parse(JSON.stringify(value));}
+function playerName(owner){return owner==="you"?(S.mode==="bot"?"You":"Player 1"):(S.mode==="bot"?"Ada":"Player 2");}
+function activePlayer(){return S[S.turn];}
+function humanTurn(){return S.started&&!S.paused&&!S.over&&(S.mode==="local"||S.turn==="you");}
+function at(r,c){return r>=0&&r<SIZE&&c>=0&&c<SIZE?S.grid[r][c]:undefined;}
+function each(fn){for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++)fn(r,c,S.grid[r][c]);}
+function gridDistance(r1,c1,r2,c2){
+  var dr=Math.abs(r1-r2),dc=Math.abs(c1-c2);
+  return GAME_CONFIG.distanceMetric==="chebyshev"?Math.max(dr,dc):dr+dc;
 }
-var DIRS=[
-  {bit:N, dr:-1, dc:0,  opp:Sd},
-  {bit:E, dr:0,  dc:1,  opp:Wd},
-  {bit:Sd,dr:1,  dc:0,  opp:N},
-  {bit:Wd,dr:0,  dc:-1, opp:E}
-];
-function rotateMask(m){
-  var out=0;
-  if(m&N){out|=E;} if(m&E){out|=Sd;}
-  if(m&Sd){out|=Wd;} if(m&Wd){out|=N;}
-  return out;
+function cellsFor(type,r,c){
+  var cells=[],n=type==="sports"?GAME_CONFIG.sportsFootprint:1;
+  for(var y=0;y<n;y++)for(var x=0;x<n;x++)cells.push([r+y,c+x,y*n+x]);
+  return cells;
 }
-function isRoad(t){ return t==="road"||t==="entrance"; }
-function shuffle(a){
-  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)), t=a[i]; a[i]=a[j]; a[j]=t; }
-  return a;
+function tileDistance(tile,r,c){
+  return Math.min.apply(null,cellsFor(tile.type,tile.r,tile.c).map(function(p){return gridDistance(p[0],p[1],r,c);}));
 }
-function buildDeck(){
-  var types=Object.keys(BANDS), t,i,j,k;
-  for(t=0;t<6000;t++){
-    var counts={}, sum=0;
-    for(i=0;i<types.length;i++){
-      var band=BANDS[types[i]];
-      counts[types[i]]=band[0]+Math.floor(Math.random()*(band[1]-band[0]+1));
-      sum+=counts[types[i]];
-    }
-    if(sum!==DECK_SIZE) continue;
-    var deck=[];
-    for(j=0;j<types.length;j++){ for(k=0;k<counts[types[j]];k++){ deck.push(types[j]); } }
-    /* the civics ride along in the same deck, so they surface when they surface */
-    civicStack().forEach(function(t){ deck.push(t); });
-    for(k=0;k<UPGRADE_COUNT;k++) deck.push("upgrade");
-    return shuffle(deck);
-  }
-  var fb=[];
-  for(i=0;i<24;i++) fb.push("house");
-  for(i=0;i<13;i++){ fb.push("park"); fb.push("shop"); }
-  for(i=0;i<14;i++) fb.push("industrial");
-  for(i=0;i<UPGRADE_COUNT;i++) fb.push("upgrade");
-  return shuffle(fb);
+function nbTypes(r,c,owner){return DIRS.map(function(d){return at(r+d.dr,c+d.dc);}).filter(function(q){return q&&q.owner===owner;}).map(function(q){return q.type;});}
+function townTiles(owner){
+  var seen={},tiles=[];
+  each(function(r,c,q){
+    if(!q||q.owner!==owner||isRoad(q.type))return;
+    var key=q.root||r+","+c;
+    if(seen[key])return;
+    seen[key]=true;
+    var root=key.split(",");
+    tiles.push(Object.assign({},q,{r:Number(root[0]),c:Number(root[1]),key:key}));
+  });
+  return tiles;
 }
+function rotateMask(mask){return ((mask<<1)&15)|((mask>>3)&1);}
+function roadRotations(mask){var out=[];for(var i=0;i<4;i++){if(out.indexOf(mask)<0)out.push(mask);mask=rotateMask(mask);}return out;}
 
-/* ===================== the shared grid ===================== */
-var S;
-function at(r,c){ return (r>=0&&r<SIZE&&c>=0&&c<SIZE) ? S.grid[r][c] : undefined; }
-function each(fn){ for(var r=0;r<SIZE;r++){ for(var c=0;c<SIZE;c++){ fn(r,c,S.grid[r][c]); } } }
-function countOwned(owner,type){
-  var n=0;
-  each(function(r,c,q){ if(q&&q.type===type&&q.owner===owner) n++; });
-  return n;
-}
-/* every query below counts only tiles belonging to `own` */
-function nbTypes(r,c,own){
-  var out=[];
-  for(var i=0;i<DIRS.length;i++){
-    var q=at(r+DIRS[i].dr,c+DIRS[i].dc);
-    if(q&&q.owner===own) out.push(q.type);
-  }
-  return out;
-}
-function near(r,c,d,type,own){
-  for(var y=Math.max(0,r-d);y<=Math.min(SIZE-1,r+d);y++){
-    for(var x=Math.max(0,c-d);x<=Math.min(SIZE-1,c+d);x++){
-      if(y===r&&x===c) continue;
-      var q=S.grid[y][x];
-      if(q&&q.type===type&&q.owner===own) return true;
-    }
-  }
-  return false;
-}
-
-/* ===================== placement ===================== */
-/* your roads join your roads only; the other town's network is nothing to you */
-function legalRoad(r,c,mask,own){
-  if(at(r,c)!==null) return false;
+/* ===================== placement, shared board and ownership ===================== */
+function legalRoad(r,c,mask,owner){
+  if(at(r,c)!==null)return false;
   var connected=false;
   for(var i=0;i<DIRS.length;i++){
-    var dir=DIRS[i], nb=at(r+dir.dr,c+dir.dc);
-    if(!nb||!isRoad(nb.type)||nb.owner!==own) continue;
-    var mine=!!(mask&dir.bit), theirs=!!(nb.mask&dir.opp);
-    if(mine!==theirs) return false;
-    if(mine) connected=true;
+    var d=DIRS[i],q=at(r+d.dr,c+d.dc);
+    if(!q||!isRoad(q.type))continue;
+    var mine=!!(mask&d.bit),theirs=!!(q.mask&d.opp);
+    if(mine!==theirs)return false;
+    if(mine&&q.owner===owner)connected=true;
   }
   return connected;
 }
-function legalBuilding(r,c,own){
-  if(at(r,c)!==null) return false;
-  for(var i=0;i<DIRS.length;i++){
-    var nb=at(r+DIRS[i].dr,c+DIRS[i].dc);
-    if(nb&&isRoad(nb.type)&&nb.owner===own) return true;
-  }
-  return false;
+function legalBuilding(r,c,owner){
+  return at(r,c)===null&&DIRS.some(function(d){var q=at(r+d.dr,c+d.dc);return q&&q.owner===owner&&isRoad(q.type);});
 }
-function legalUpgrade(r,c,own){
-  var q=at(r,c);
-  return !!q&&q.type==="house"&&q.owner===own&&!q.upgraded;
-}
-/* the sports centre covers a 2x2 block; everything else is a single square */
-function cellsFor(type,r,c){
-  if(type==="sports"){
-    return [[r,c,0],[r,c+1,1],[r+1,c,2],[r+1,c+1,3]];
-  }
-  return [[r,c,0]];
-}
-function legalSports(r,c,own){
-  var cells=cellsFor("sports",r,c), i;
-  for(i=0;i<cells.length;i++){
-    var y=cells[i][0], x=cells[i][1];
-    if(y<0||y>=SIZE||x<0||x>=SIZE) return false;
-    if(S.grid[y][x]!==null) return false;
-  }
-  for(i=0;i<cells.length;i++){
-    if(legalBuilding(cells[i][0],cells[i][1],own)) return true;
-  }
-  return false;
-}
-function legalFor(item,r,c,own){
-  if(item.type==="road") return legalRoad(r,c,item.mask,own);
-  if(item.type==="sports") return legalSports(r,c,own);
-  if(item.type==="upgrade") return legalUpgrade(r,c,own);
-  return legalBuilding(r,c,own);
-}
-function putTile(P,item,mask,r,c){
-  if(item.type==="upgrade"){
-    P.order++;
-    S.grid[r][c].upgraded=true;
-    S.grid[r][c].upgradeOrder=P.order;
-    return;
-  }
+function legalFor(item,r,c,owner){
+  if(!item||!NAMES[item.type]||item.type==="entrance")return false;
+  if(item.type==="road")return legalRoad(r,c,item.mask,owner);
   var cells=cellsFor(item.type,r,c);
-  P.order++;
-  for(var i=0;i<cells.length;i++){
-    S.grid[cells[i][0]][cells[i][1]]={
-      type:item.type, mask:mask, v:(item.type==="sports"?cells[i][2]:item.v),
-      order:P.order, owner:P.owner, root:r+","+c
-    };
-  }
+  return cells.every(function(p){return at(p[0],p[1])===null;})&&cells.some(function(p){return legalBuilding(p[0],p[1],owner);});
 }
-function clearTile(type,r,c){
-  if(type==="upgrade"){
-    delete S.grid[r][c].upgraded;
-    delete S.grid[r][c].upgradeOrder;
-    return;
-  }
-  var cells=cellsFor(type,r,c);
-  for(var i=0;i<cells.length;i++){ S.grid[cells[i][0]][cells[i][1]]=null; }
+function hospitalValue(population){return Math.min(GAME_CONFIG.hospitalMaxAttraction,Math.floor(population/GAME_CONFIG.hospitalPopulationDivisor));}
+function putTile(owner,item,r,c){
+  var locked=item.type==="hospital"?hospitalValue(calculateTown(owner).population):null;
+  cellsFor(item.type,r,c).forEach(function(p){
+    var q={type:item.type,owner:owner,mask:item.mask||0,v:item.type==="sports"?p[2]:(item.v||0),root:r+","+c};
+    if(locked!==null)q.lockedAttraction=locked;
+    S.grid[p[0]][p[1]]=q;
+  });
 }
-function anyLegal(P,items){
-  items=items||P.hand;
-  for(var h=0;h<items.length;h++){
-    var item=items[h];
-    for(var r=0;r<SIZE;r++){
-      for(var c=0;c<SIZE;c++){
-        if(item.type==="road"){
-          var m=item.mask;
-          for(var i=0;i<4;i++){ if(legalRoad(r,c,m,P.owner)) return true; m=rotateMask(m); }
-        } else if(legalFor(item,r,c,P.owner)){ return true; }
-      }
-    }
-  }
-  return false;
+function clearTile(type,r,c){cellsFor(type,r,c).forEach(function(p){S.grid[p[0]][p[1]]=null;});}
+function openEnds(owner){
+  var ends={};
+  each(function(r,c,q){if(q&&q.owner===owner&&isRoad(q.type))DIRS.forEach(function(d){if((q.mask&d.bit)&&at(r+d.dr,c+d.dc)===null)ends[(r+d.dr)+","+(c+d.dc)]=true;});});
+  return Object.keys(ends).length;
 }
-/* Include the whole remaining supply: a useful tile may be below the top one.
-   Other players' hands are private supplies and cannot be used here. */
-function canDevelop(P){
-  if(anyLegal(P)) return true;
-  var seen={}, available=[];
-  function add(type,mask){
-    var key=type+":"+mask;
-    if(seen[key]||!canTakeTile(P,type)) return;
-    seen[key]=true;
-    available.push({type:type,mask:mask});
-  }
-  S.market.forEach(function(it){ add(it.type,it.mask); });
-  S.deck.forEach(function(type){ add(type,0); });
-  S.roads.forEach(function(mask){ add("road",mask); });
-  return anyLegal(P,available);
+function openPlots(owner){var n=0;each(function(r,c,q){if(!q&&legalBuilding(r,c,owner))n++;});return n;}
+
+/* ===================== board-derived population ===================== */
+function effect(effects,tile,value,kind,detail){
+  effects[tile.key]={type:tile.type,value:value,kind:kind,detail:detail};
+  return value;
 }
-function canPass(P){
-  var canDraw=S.roads.length>0||S.market.some(function(it){ return canTakeTile(P,it.type); });
-  return !canDevelop(P)||(!anyLegal(P)&&!canDraw);
-}
-/* is this empty cell one of own's open road ends? Building there seals the
-   network off, which is how the bot used to strangle itself. */
-function isEndCell(r,c,own){
-  for(var i=0;i<DIRS.length;i++){
-    var d=DIRS[i];
-    var q=at(r+d.dr,c+d.dc);
-    if(q&&isRoad(q.type)&&q.owner===own&&(q.mask&d.opp)) return true;
-  }
-  return false;
-}
-function openPlots(own){
-  var n=0;
-  each(function(r,c,q){ if(!q&&legalBuilding(r,c,own)) n++; });
-  return n;
-}
-/* empty cells your road network actually opens onto. If this hits zero your
-   town can never grow again, however many plots you think you have. */
-/* the half of the board you entered from */
-function homeRow(own){ return own==="you" ? SIZE-1 : 0; }
-function isHomeHalf(own,r){
-  return own==="you" ? r>=Math.floor(SIZE/2) : r<=Math.floor(SIZE/2);
-}
-function homePlots(own){
-  var n=0;
-  each(function(r,c,q){ if(!q&&isHomeHalf(own,r)&&legalBuilding(r,c,own)) n++; });
-  return n;
-}
-function openEnds(own){
-  var seen={}, n=0;
-  each(function(r,c,q){
-    if(!q||!isRoad(q.type)||q.owner!==own) return;
-    for(var i=0;i<DIRS.length;i++){
-      var d=DIRS[i];
-      if(!(q.mask&d.bit)) continue;
-      var y=r+d.dr, x=c+d.dc;
-      if(y<0||y>=SIZE||x<0||x>=SIZE) continue;
-      if(S.grid[y][x]) continue;
-      var key=y+","+x;
-      if(!seen[key]){ seen[key]=1; n++; }
+function calculateAccommodation(owner,tiles,effects){
+  var houses=0,apartments=0;
+  tiles.forEach(function(t){
+    if(t.type==="house")houses+=effect(effects,t,GAME_CONFIG.houseAccommodation,"Accommodation","House");
+    if(t.type==="apartment"){
+      var adjacent=nbTypes(t.r,t.c,owner),active=adjacent.indexOf("park")>=0&&adjacent.indexOf("shop")>=0;
+      apartments+=effect(effects,t,active?GAME_CONFIG.apartmentAccommodation:0,"Accommodation",active?"Park and Shop adjacent":"Needs an adjacent Park AND Shop");
     }
   });
-  return n;
+  return {houses:houses,apartments:apartments,total:houses+apartments};
+}
+function calculateParkAttraction(owner,tiles,effects){
+  return tiles.filter(function(t){return t.type==="park";}).reduce(function(total,t){
+    var active=nbTypes(t.r,t.c,owner).indexOf("house")>=0;
+    return total+effect(effects,t,active?GAME_CONFIG.parkAttraction:0,"Attraction",active?"Touches at least one House":"No adjacent House");
+  },0);
+}
+function shopGroupValue(size){return size===1?GAME_CONFIG.shops.one:size===2?GAME_CONFIG.shops.two:GAME_CONFIG.shops.threePlus;}
+function calculateShopAttraction(owner,tiles,effects){
+  var shops={},seen={},groups=[];
+  tiles.forEach(function(t){if(t.type==="shop")shops[t.key]=t;});
+  Object.keys(shops).forEach(function(key){
+    if(seen[key])return;
+    var queue=[shops[key]],group=[];seen[key]=true;
+    while(queue.length){
+      var t=queue.pop();group.push(t);
+      DIRS.forEach(function(d){var k=(t.r+d.dr)+","+(t.c+d.dc);if(shops[k]&&!seen[k]){seen[k]=true;queue.push(shops[k]);}});
+    }
+    var value=shopGroupValue(group.length);
+    group.forEach(function(t){effect(effects,t,value,"Attraction",group.length+" Shops in this group · counted once per group");});
+    groups.push({size:group.length,value:value,tiles:group.map(function(t){return t.key;})});
+  });
+  return {total:groups.reduce(function(n,g){return n+g.value;},0),groups:groups};
+}
+function calculateIndustryAttraction(owner,tiles,effects){
+  var houses=tiles.filter(function(t){return t.type==="house";});
+  return tiles.filter(function(t){return t.type==="industrial";}).reduce(function(total,t){
+    var blocked=houses.some(function(h){return gridDistance(t.r,t.c,h.r,h.c)<=GAME_CONFIG.industryHouseRange;});
+    return total+effect(effects,t,blocked?0:GAME_CONFIG.industryAttraction,"Attraction",blocked?"House in exclusion range":"No Houses in exclusion range");
+  },0);
+}
+function calculateSchoolAttraction(owner,tiles,effects){
+  var houses=tiles.filter(function(t){return t.type==="house";});
+  return tiles.filter(function(t){return t.type==="school";}).reduce(function(total,t){
+    var count=houses.filter(function(h){return gridDistance(t.r,t.c,h.r,h.c)<=GAME_CONFIG.schoolRange;}).length;
+    return total+effect(effects,t,count*GAME_CONFIG.schoolAttractionPerHouse,"Attraction",count+" Houses in catchment");
+  },0);
+}
+function calculateHospitalAttraction(owner,tiles,effects){
+  return tiles.filter(function(t){return t.type==="hospital";}).reduce(function(total,t){
+    return total+effect(effects,t,t.lockedAttraction||0,"Attraction","Locked when placed");
+  },0);
+}
+function calculateSportsAttraction(owner,tiles,effects){
+  return tiles.filter(function(t){return t.type==="sports";}).reduce(function(total,t){
+    var types={};
+    tiles.forEach(function(other){if(other.type!=="sports"&&tileDistance(t,other.r,other.c)<=GAME_CONFIG.sportsRange)types[other.type]=true;});
+    var names=Object.keys(types),value=Math.min(GAME_CONFIG.sportsMaxAttraction,names.length*GAME_CONFIG.sportsAttractionPerType);
+    return total+effect(effects,t,value,"Attraction",names.length+" different types: "+(names.map(function(type){return NAMES[type];}).join(", ")||"none"));
+  },0);
+}
+function calculateTown(owner){
+  var tiles=townTiles(owner),effects={},homes=calculateAccommodation(owner,tiles,effects);
+  var parks=calculateParkAttraction(owner,tiles,effects),shops=calculateShopAttraction(owner,tiles,effects);
+  var industry=calculateIndustryAttraction(owner,tiles,effects),school=calculateSchoolAttraction(owner,tiles,effects);
+  var hospital=calculateHospitalAttraction(owner,tiles,effects),sports=calculateSportsAttraction(owner,tiles,effects);
+  var attraction=parks+shops.total+industry+school+hospital+sports;
+  return {accommodation:homes.total,attraction:attraction,population:Math.min(homes.total,attraction),
+    breakdown:{houses:homes.houses,apartments:homes.apartments,parks:parks,shops:shops.total,industry:industry,school:school,hospital:hospital,sports:sports},
+    shopGroups:shops.groups,effects:effects};
+}
+function previewPlacement(owner,item,r,c){
+  if(!legalFor(item,r,c,owner))return null;
+  var before=calculateTown(owner),after;
+  try{putTile(owner,item,r,c);after=calculateTown(owner);}finally{clearTile(item.type,r,c);}
+  var changes=[];
+  Object.keys(after.effects).forEach(function(key){
+    var now=after.effects[key],old=before.effects[key];
+    if(old&&old.value!==now.value)changes.push({key:key,type:now.type,from:old.value,to:now.value,detail:now.detail});
+  });
+  return {r:r,c:c,before:before,after:after,changes:changes};
 }
 
-/* ===================== scoring ===================== */
-/* Residential tiles are scored against their own town only. */
-/* A school only teaches if industry isn't breathing down its neck. Homes in
-   overlapping catchments receive the school effect once, never per school. */
-function schoolCoverage(r,c,own){
-  var any=false, covered=false;
-  each(function(y,x,q){
-    if(!q||q.type!=="school"||q.owner!==own||near(y,x,2,"industrial",own)) return;
-    any=true;
-    if(Math.max(Math.abs(y-r),Math.abs(x-c))<=2) covered=true;
-  });
-  return {any:any,covered:covered};
+/* ===================== seeded supply and game state ===================== */
+function seedNumber(seed){var hash=2166136261;for(var i=0;i<seed.length;i++)hash=Math.imul(hash^seed.charCodeAt(i),16777619);return hash>>>0;}
+function random(){S.rng=(Math.imul(1664525,S.rng)+1013904223)>>>0;return S.rng/4294967296;}
+function shuffle(items){for(var i=items.length-1;i>0;i--){var j=Math.floor(random()*(i+1)),t=items[i];items[i]=items[j];items[j]=t;}return items;}
+function makeItem(type,mask){return {type:type,mask:mask||0,v:Math.floor(random()*(VARIANTS[type]||1))};}
+function buildDeck(){
+  var deck=[];
+  Object.keys(GAME_CONFIG.normalTiles).forEach(function(type){for(var i=0;i<GAME_CONFIG.normalTiles[type];i++)deck.push(makeItem(type));});
+  Object.keys(GAME_CONFIG.roadTiles).forEach(function(mask){for(var i=0;i<GAME_CONFIG.roadTiles[mask];i++)deck.push(makeItem("road",Number(mask)));});
+  return shuffle(deck);
 }
-function houseScore(r,c,own){
-  var p=1, plus=["+1 residential base"], minus=[];
-  var home=at(r,c);
-  if(home&&home.type==="house"&&home.upgraded){ p+=2; plus.push("+2 house upgrade"); }
-  if(near(r,c,1,"park",own)){ p+=1; plus.push("+1 park"); }
-  if(near(r,c,3,"sports",own)){ p+=3; plus.push("+3 sports centre"); }
-  var school=schoolCoverage(r,c,own);
-  if(school.covered){ p+=3; plus.push("+3 school catchment"); }
-  else if(school.any){ p-=1; minus.push("\u22121 outside school catchment"); }
-  if(near(r,c,2,"industrial",own)){ p-=3; minus.push("\u22123 industry within 2"); }
-  return {points:Math.max(0,p),plus:plus,minus:minus};
+function newPlayer(owner){return {owner:owner,civics:CIVIC_TYPES.map(function(type){return {type:type,mask:0,v:0};}),turns:0};}
+function refill(index){
+  if(index!==undefined){if(S.deck.length)S.market[index]=S.deck.pop();else S.market.splice(index,1);}
+  else while(S.market.length<GAME_CONFIG.marketSize&&S.deck.length)S.market.push(S.deck.pop());
 }
-/* a house holds 2 citizens, an apartment 4; each factory has 6 jobs.
-   Distance is irrelevant: people commute, they just don't want to live
-   next to the place. */
-var JOBS_PER_FACTORY=6;
-function employedSet(own){
-  var homes=[], citizens=0;
-  each(function(r,c,q){
-    if(q&&isHome(q.type)&&q.owner===own){
-      var need=residents(q);
-      homes.push({key:r+","+c, need:need});
-      citizens+=need;
-    }
-  });
-  var jobs=countOwned(own,"industrial")*JOBS_PER_FACTORY;
-  var left=jobs, set={}, n=0;
-  homes.forEach(function(h){
-    if(left>=h.need){ set[h.key]=true; left-=h.need; n++; }
-  });
-  return {set:set, jobs:jobs, citizens:citizens, houses:homes.length, employed:n,
-          employedCitizens:Math.min(jobs,citizens)};
-}
-/* Apartments hold four citizens and score double — but only where the
-   amenities exist to support that density. */
-function homeScore(r,c,own){
-  var base=houseScore(r,c,own);
-  var q=S.grid[r][c];
-  if(!q||q.type!=="apartment") return base;
-  var nb=nbTypes(r,c,own);
-  if(nb.indexOf("park")<0||nb.indexOf("shop")<0){
-    return {points:0, plus:[], minus:["needs a park and a shop directly next to it"]};
+function newGame(options){
+  options=options||{};clearTimeout(botTimer);botTimer=null;moveHistory=[];
+  SIZE=GAME_CONFIG.boardSize;
+  var seed=String(options.seed||Date.now());
+  S={grid:[],land:[],seed:seed,rng:seedNumber(seed),mode:options.mode==="local"?"local":"bot",you:newPlayer("you"),bot:newPlayer("bot"),
+    turn:"you",market:[],deck:[],selected:null,preview:null,inspect:null,fresh:null,finalTurn:false,over:false,started:true,paused:false,result:null};
+  for(var r=0;r<SIZE;r++){
+    S.grid.push(new Array(SIZE).fill(null));
+    var row=[];for(var c=0;c<SIZE;c++)row.push(Math.floor(random()*12));S.land.push(row);
   }
-  return {points:base.points*2, plus:base.plus.concat(["\u00d72 apartment"]), minus:base.minus};
-}
-var SHOP_GROUP_POINTS=[0,0,2,7,12];
-function shopGroupPoints(size){
-  /* Four was the largest playtest group specified. Larger districts keep the
-     same +5 marginal value instead of becoming worse when another shop joins. */
-  return size<SHOP_GROUP_POINTS.length ? SHOP_GROUP_POINTS[size] : 12+(size-4)*5;
-}
-function shopDistrictAt(r,c,own){
-  var q=at(r,c);
-  if(!q||q.type!=="shop"||q.owner!==own) return {size:0,points:0};
-  var seen={}, stack=[[r,c]], size=0;
-  while(stack.length){
-    var here=stack.pop(), key=here[0]+","+here[1];
-    if(seen[key]) continue;
-    seen[key]=1; size++;
-    for(var i=0;i<DIRS.length;i++){
-      var y=here[0]+DIRS[i].dr, x=here[1]+DIRS[i].dc, nb=at(y,x);
-      if(nb&&nb.type==="shop"&&nb.owner===own&&!seen[y+","+x]) stack.push([y,x]);
-    }
-  }
-  return {size:size,points:shopGroupPoints(size)};
-}
-function shopScore(own){
-  var seen={}, points=0, groups=[];
-  each(function(r,c,q){
-    var start=r+","+c;
-    if(!q||q.type!=="shop"||q.owner!==own||seen[start]) return;
-    var stack=[[r,c]], size=0;
-    while(stack.length){
-      var here=stack.pop(), key=here[0]+","+here[1];
-      if(seen[key]) continue;
-      seen[key]=1; size++;
-      for(var i=0;i<DIRS.length;i++){
-        var y=here[0]+DIRS[i].dr, x=here[1]+DIRS[i].dc, nb=at(y,x);
-        if(nb&&nb.type==="shop"&&nb.owner===own&&!seen[y+","+x]) stack.push([y,x]);
-      }
-    }
-    groups.push(size); points+=shopGroupPoints(size);
-  });
-  return {points:points,groups:groups};
-}
-function score(P){
-  var emp=employedSet(P.owner);
-  var houses=0, housePts=0;
-  each(function(r,c,q){
-    if(q&&isHome(q.type)&&q.owner===P.owner){
-      houses++;
-      housePts+=homeScore(r,c,P.owner).points;
-    }
-  });
-  var shops=shopScore(P.owner);
-  var industryPts=Math.floor(emp.employedCitizens/2);
-  var hospitalActive=emp.citizens>=10;
-  var hospitalPts=hospitalActive ? countOwned(P.owner,"hospital")*8 : 0;
-  return {houses:houses,housePts:housePts,shopPts:shops.points,shopGroups:shops.groups,
-          industryPts:industryPts,hospitalPts:hospitalPts,hospitalActive:hospitalActive,
-          total:housePts+shops.points+industryPts+hospitalPts,
-          employed:emp.employed,employedCitizens:emp.employedCitizens,
-          jobs:emp.jobs,citizens:emp.citizens};
-}
-
-/* ===================== game state ===================== */
-function newPlayer(owner){
-  return {owner:owner, hand:[], order:0, tookRoad:false};
-}
-function newGame(size){
-  clearTimeout(botTimer); botTimer=null;
-  size=Number(size);
-  if(MAP_SIZES.indexOf(size)>=0) SIZE=size;
-  YOU_GATE={r:SIZE-1,c:Math.floor(SIZE/2),mask:N|E|Wd};
-  BOT_GATE={r:0,c:Math.floor(SIZE/2),mask:Sd|E|Wd};
-  document.getElementById("setup").close();
-  document.getElementById("over").close();
+  var mid=Math.floor(SIZE/2);
+  S.grid[SIZE-1][mid]={type:"entrance",mask:N|E|Wd,owner:"you",v:0,root:(SIZE-1)+","+mid};
+  S.grid[0][mid]={type:"entrance",mask:Sd|E|Wd,owner:"bot",v:0,root:"0,"+mid};
+  putTile("you",{type:"house",v:0},SIZE-1,mid-1);
+  putTile("bot",{type:"house",v:1},0,mid+1);
+  S.deck=buildDeck();refill();cellEls=null;
+  document.getElementById("setup").close();document.getElementById("over").close();
   document.getElementById("board").style.setProperty("--mapsize",SIZE);
-  var grid=[], land=[], r, c;
-  for(r=0;r<SIZE;r++){
-    grid.push(new Array(SIZE).fill(null));
-    var row=[];
-    for(c=0;c<SIZE;c++){ row.push(Math.floor(Math.random()*GRASS_VARIANTS)); }
-    land.push(row);
+  renderLegend();render();
+}
+function choices(owner){
+  return S.market.map(function(item,index){return {source:"market",index:index,item:item};}).concat(S[owner].civics.map(function(item,index){return {source:"civic",index:index,item:item};}));
+}
+function eachPlacement(owner,item,visit){
+  var masks=item.type==="road"?roadRotations(item.mask):[item.mask||0];
+  for(var m=0;m<masks.length;m++){
+    var probe=Object.assign({},item,{mask:masks[m]});
+    for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++)if(legalFor(probe,r,c,owner)&&visit(probe,r,c)===false)return false;
   }
-  S={
-    grid:grid, land:land,
-    you:newPlayer("you"), bot:newPlayer("bot"),
-    deck:buildDeck(), market:[], roads:shuffle(roadStack()),
-    turn:"you", mode:null, used:0,
-    selected:null, inspect:null, fresh:null, over:false, started:true, paused:false
-  };
-  grid[YOU_GATE.r][YOU_GATE.c]={type:"entrance",mask:YOU_GATE.mask,v:0,order:0,owner:"you"};
-  grid[BOT_GATE.r][BOT_GATE.c]={type:"entrance",mask:BOT_GATE.mask,v:0,order:0,owner:"bot"};
-  cellEls=null;
-  refill();
-  render();
+  return true;
 }
-var VARIANTS={park:4, house:2, shop:2, industrial:2, apartment:2};
-function variantsFor(type){ return VARIANTS[type]||1; }
-function refill(){
-  while(S.market.length<MARKET_SIZE&&S.deck.length){
-    var t=S.deck.pop();
-    S.market.push({type:t,mask:0,v:Math.floor(Math.random()*variantsFor(t))});
-  }
+function hasLegalChoice(owner){
+  return choices(owner).some(function(choice){var found=false;eachPlacement(owner,choice.item,function(){found=true;return false;});return found;});
 }
-/* one of each civic per player, counting what's already in hand */
-function hasCivic(P,type){
-  if(countOwned(P.owner,type)>0) return true;
-  return P.hand.some(function(i){ return i.type===type; });
+function canPass(owner){return !hasLegalChoice(owner);}
+function selectTile(source,index){
+  if(!humanTurn())return;
+  var list=source==="market"?S.market:activePlayer().civics;
+  if(!list[index])return;
+  S.selected={source:source,index:index,item:clone(list[index])};S.preview=null;S.inspect=null;render();
 }
-function canTakeTile(P,type){
-  return !isCivic(type) || !hasCivic(P,type);
+function stagePlacement(r,c){
+  if(!humanTurn()||!S.selected)return;
+  var preview=previewPlacement(S.turn,S.selected.item,r,c);
+  if(!preview)return;
+  S.preview=preview;S.inspect=null;render();
 }
-/* ===================== your turn ===================== */
-function canTake(){ return S.started&&!S.paused&&!S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="take"); }
-function canPlace(){ return S.started&&!S.paused&&!S.over&&S.turn==="you"&&S.used<2&&(S.mode===null||S.mode==="place"); }
-function take(what){
-  if(!canTake()) return;
-  var P=S.you;
-  if(what==="road"){
-    if(P.tookRoad||!S.roads.length) return;
-    P.hand.push({type:"road",mask:S.roads.pop(),v:0});
-    P.tookRoad=true;
-  } else {
-    var t=S.market[what];
-    if(!t||!canTakeTile(P,t.type)) return;
-    P.hand.push(S.market.splice(what,1)[0]);
-    refill();
-  }
-  S.mode="take"; S.used++; S.inspect=null;
-  if(S.used>=2){ endTurn(); } else { render(); }
+function saveTurn(){var state=clone(S);state.selected=null;state.preview=null;state.inspect=null;moveHistory.push(state);}
+function commitPlacement(choice,r,c){
+  if(!S.started||S.paused||S.over||!choice)return false;
+  var owner=S.turn,list=choice.source==="market"?S.market:choice.source==="civic"?S[owner].civics:[];
+  var actual=list[choice.index];
+  if(!actual||actual.type!==choice.item.type||!legalFor(choice.item,r,c,owner))return false;
+  if(actual.type==="road"&&roadRotations(actual.mask).indexOf(choice.item.mask)<0)return false;
+  saveTurn();putTile(owner,choice.item,r,c);
+  if(choice.source==="market")refill(choice.index);else list.splice(choice.index,1);
+  S.fresh={r:r,c:c};S.selected=null;S.preview=null;S.inspect=null;
+  completeTurn(owner);return true;
 }
-function place(r,c){
-  if(!canPlace()||S.selected===null) return;
-  var P=S.you, item=P.hand[S.selected];
-  if(!legalFor(item,r,c,"you")) return;
-  putTile(P,item,item.mask,r,c);
-  P.hand.splice(S.selected,1);
-  S.selected=null; S.mode="place"; S.used++; S.inspect={r:r,c:c};
-  if(gameShouldEnd()){ finish(); return; }
-  if(S.used>=2){ endTurn(); } else { render(); }
+function confirmPlacement(){if(humanTurn()&&S.preview&&S.selected)commitPlacement(S.selected,S.preview.r,S.preview.c);}
+function completeTurn(owner){
+  S[owner].turns++;
+  var town=calculateTown(owner);
+  if(owner==="you"&&town.population>=GAME_CONFIG.winPopulation)S.finalTurn=true;
+  if(owner==="bot"&&(S.finalTurn||town.population>=GAME_CONFIG.winPopulation)){finish("target");return;}
+  S.turn=owner==="you"?"bot":"you";
+  if(!S.finalTurn&&!hasLegalChoice("you")&&!hasLegalChoice("bot")){finish("blocked");return;}
+  render();scheduleBot();
 }
-function endTurn(){
-  if(!S.started||S.paused||S.over||S.turn!=="you") return;
-  S.mode=null; S.used=0; S.selected=null; S.you.tookRoad=false;
-  if(gameShouldEnd()){ finish(); return; }
-  S.turn="bot";
-  render("Ada is thinking\u2026 ");
-  botTimer=setTimeout(botTurn,480);
+function passTurn(){
+  if(!S.started||S.paused||S.over||!canPass(S.turn))return false;
+  saveTurn();var owner=S.turn;S.selected=null;S.preview=null;S.inspect=null;completeTurn(owner);return true;
 }
-function gameShouldEnd(){
-  return !canDevelop(S.you)&&!canDevelop(S.bot);
+function undoMove(){
+  if(!moveHistory.length||!S.started||S.paused)return;
+  clearTimeout(botTimer);botTimer=null;
+  var previous=moveHistory.pop();
+  if(previous.mode==="bot"&&previous.turn==="bot"&&moveHistory.length)previous=moveHistory.pop();
+  S=previous;S.paused=false;cellEls=null;document.getElementById("over").close();render();scheduleBot();
+}
+function finish(reason){
+  clearTimeout(botTimer);botTimer=null;S.over=true;S.selected=null;S.preview=null;S.inspect=null;
+  var one=calculateTown("you"),two=calculateTown("bot");
+  S.result={reason:reason,winner:one.population===two.population?null:one.population>two.population?"you":"bot"};
+  render();showResults();
 }
 
-/* ===================== the bot ===================== */
-function marketWant(P,type){
-  var own=P.owner;
-  var e=employedSet(own);
-  var shortfall=Math.max(0,e.citizens-e.jobs);          /* citizens with no job */
-  var parks=countOwned(own,"park"), shops=countOwned(own,"shop");
-  function held(t){ return P.hand.filter(function(i){ return i.type===t; }).length; }
-
-  if(isCivic(type)) return 6;                            /* rare and always useful */
-  if(type==="upgrade"){
-    var targets=0;
-    each(function(r,c,q){ if(q&&q.type==="house"&&q.owner===own&&!q.upgraded) targets++; });
-    return targets ? 4.4+Math.min(targets,4)*0.35-held("upgrade")*1.8 : -4;
-  }
-
-  if(type==="industrial"){
-    /* one factory covers six citizens; chase the shortfall, don't stockpile */
-    return 1.6 + Math.min(shortfall,12)*0.45 - held("industrial")*1.6;
-  }
-  if(type==="park"||type==="shop"){
-    var have=(type==="park")?parks:shops;
-    var w=2.8 - have*0.30 - held(type)*1.1;
-    if(held("apartment")>0) w+=2.4;                      /* a block needs both */
-    return w;
-  }
-  if(type==="apartment"){
-    /* worth double, but only where the amenities already exist */
-    var ready=(parks>0&&shops>0);
-    return (ready?3.4:0.6) - shortfall*0.22 - held("apartment")*3;
-  }
-  /* houses */
-  return 3.0 - shortfall*0.22 - held("house")*0.7;
-}
-/* empty plots within d that a tile here would eventually serve */
-function servablePlots(r,c,own,d){
-  var n=0;
-  for(var y=Math.max(0,r-d);y<=Math.min(SIZE-1,r+d);y++){
-    for(var x=Math.max(0,c-d);x<=Math.min(SIZE-1,c+d);x++){
-      if(!S.grid[y][x]&&legalBuilding(y,x,own)) n++;
-    }
-  }
-  return n;
-}
-/* how far each tile type reaches, for judging what it will serve later */
-/* only amenities gain from reaching empty ground; civics are better judged
-   on the homes that already exist near them */
-var REACH={park:1};
-function bestPlacement(P,forcePlants,strict){
-  var b0=score(P);
-  var beforeCore=b0.total;
-  var best=null;
-  var tilesLeft=S.deck.length+S.market.length;
-  var stillPlaying=(tilesLeft>0||P.hand.length>1);
-  var roomAtHome=homePlots(P.owner);
-  var home=homeRow(P.owner);
-  for(var h=0;h<P.hand.length;h++){
-    var item=P.hand[h];
-    var masks=[item.mask];
-    if(item.type==="road"){
-      masks=[]; var m=item.mask;
-      for(var k=0;k<4;k++){ masks.push(m); m=rotateMask(m); }
-    }
-    for(var mi=0;mi<masks.length;mi++){
-      for(var r=0;r<SIZE;r++){
-        for(var c=0;c<SIZE;c++){
-          var probe={type:item.type,mask:masks[mi],v:item.v};
-          if(!legalFor(probe,r,c,P.owner)) continue;
-          var sealsEnd=(probe.type!=="road"&&probe.type!=="upgrade")&&isEndCell(r,c,P.owner);
-          if(strict&&stillPlaying&&sealsEnd) continue;
-          var savedOrder=P.order;
-          putTile(P,probe,masks[mi],r,c);
-          var a1=score(P);
-          var gain=a1.total-beforeCore;
-          var plots=openPlots(P.owner);
-          var ends=openEnds(P.owner);
-          clearTile(probe.type,r,c);
-          P.order=savedOrder;
-          /* a town with no open road end is finished, whatever points are on
-             offer — so in strict mode this is a rule, not a preference */
-          if(strict&&stillPlaying&&(ends===0||plots===0)) continue;
-          /* crossing the middle is a real strategy, so it stays available —
-             just damped, so she doesn't abandon her own side for no reason */
-          var away=!isHomeHalf(P.owner,r);
-          /* a tile that reaches empty ground is worth more than its points
-             today: those plots will hold homes before the game ends */
-          var future=0, reach=REACH[probe.type];
-          if(reach){
-            future=Math.min(servablePlots(r,c,P.owner,reach),10)*0.55;
-          }
-          var delta=gain+future+0.9*plots+6*ends;
-          delta-=Math.abs(r-home)*0.12;
-          if(away) delta-=Math.min(roomAtHome,8)*0.22;
-          if(stillPlaying){
-            if(sealsEnd) delta-=30;
-            if(ends===0) delta-=200; else if(ends===1) delta-=25;
-            if(plots===0) delta-=120; else if(plots<=2) delta-=15;
-          }
-          if(!best||delta>best.delta){
-            best={h:h,mask:masks[mi],r:r,c:c,delta:delta,gain:gain,plots:plots,ends:ends};
-          }
-        }
-      }
-    }
-  }
+/* ===================== Ada's one-tile placement turn ===================== */
+function chooseBotMove(owner){
+  var before=calculateTown(owner),plotsBefore=openPlots(owner),endsBefore=openEnds(owner),best=null;
+  choices(owner).forEach(function(choice){
+    eachPlacement(owner,choice.item,function(item,r,c){
+      putTile(owner,item,r,c);
+      var after=calculateTown(owner),plots=openPlots(owner),ends=openEnds(owner);
+      var value=(after.population-before.population)*10+
+        Math.min(12,after.accommodation-after.population)*0.7+Math.min(12,after.attraction-after.population)*0.9;
+      value+=Math.min(8,plots)*0.6+Math.min(4,ends)*1.8;
+      if(item.type==="road")value+=(plots-plotsBefore)*2+(ends-endsBefore)*2;
+      if(item.type==="house")value+=1.5;
+      if(item.type==="park"||item.type==="shop")value+=1;
+      if(isCivic(item.type)&&after.population-before.population<3)value-=5;
+      if(item.type==="hospital")value-=Math.max(0,GAME_CONFIG.hospitalMaxAttraction-hospitalValue(before.population))*0.9;
+      if(item.type==="sports")value-=3;
+      if(ends===0)value-=24;
+      if(after.population>=GAME_CONFIG.winPopulation)value+=500;
+      value-=Math.abs(r-(owner==="you"?SIZE-1:0))*0.03;
+      clearTile(item.type,r,c);
+      if(!best||value>best.value)best={source:choice.source,index:choice.index,item:clone(item),r:r,c:c,value:value};
+    });
+  });
   return best;
 }
-/* try the safe options first; only if none exist do we allow a strangling move */
-function choosePlacement(P,forcePlants){
-  return bestPlacement(P,forcePlants,true) || bestPlacement(P,forcePlants,false);
-}
-function botAct(P){
-  if(!canDevelop(P)) return false;
-  var tilesLeft=S.deck.length+S.market.length;
-  var forcePlants=false;
-  var safe=bestPlacement(P,forcePlants,true);
-  if(forcePlants&&!safe) safe=bestPlacement(P,false,true);
-  var best=safe||bestPlacement(P,forcePlants,false)||bestPlacement(P,false,false);
-  /* every placement available would strangle the network: better to spend the
-     turn drawing a road shape that fits than to brick the town */
-  var compromised=!safe&&!!best;
-  var canDraw=S.market.length>0||S.roads.length>0;
-
-  var plots=openPlots(P.owner);
-  var ends=openEnds(P.owner);
-  var roadsInHand=P.hand.filter(function(i){ return i.type==="road"; }).length;
-  /* no road in hand and nowhere left to build: go and get a road */
-  var starving=(plots<=2||ends<=1)&&roadsInHand===0&&S.roads.length>0;
-
-  var wantPlace=best&&(forcePlants||P.hand.length>=4||best.gain>=1||!S.market.length);
-  if(starving&&!forcePlants&&S.mode===null) wantPlace=false;
-  /* wait for a road that fits, but not forever — hoarding is its own failure */
-  if(compromised&&canDraw&&!forcePlants&&S.mode===null&&P.hand.length<8) wantPlace=false;
-  if(S.mode==="place") wantPlace=!!best&&(!compromised||!canDraw||P.hand.length>=8);
-  if(S.mode==="take") wantPlace=false;
-
-  if(wantPlace&&(S.mode===null||S.mode==="place")){
-    var item=P.hand[best.h];
-    putTile(P,item,best.mask,best.r,best.c);
-    P.hand.splice(best.h,1);
-    S.fresh={r:best.r,c:best.c};
-    S.mode="place";
-    return true;
-  }
-  if(S.mode===null||S.mode==="take"){
-    if(!P.tookRoad&&S.roads.length&&(compromised||plots<8||ends<3||roadsInHand===0||Math.random()<0.4)){
-      P.hand.push({type:"road",mask:S.roads.pop(),v:0});
-      P.tookRoad=true; S.mode="take";
-      return true;
-    }
-    if(S.market.length){
-      var bi=0, bv=-99;
-      S.market.forEach(function(it,i){
-        if(!canTakeTile(P,it.type)) return;
-        var w=marketWant(P,it.type);
-        if(w>bv){ bv=w; bi=i; }
-      });
-      if(bv<=-99) return false;
-      P.hand.push(S.market.splice(bi,1)[0]);
-      refill(); S.mode="take";
-      return true;
-    }
-    if(!P.tookRoad&&S.roads.length){
-      P.hand.push({type:"road",mask:S.roads.pop(),v:0});
-      P.tookRoad=true; S.mode="take";
-      return true;
-    }
-  }
-  /* nothing worth taking: place something rather than pass the turn away */
-  if(best&&(S.mode===null||S.mode==="place")){
-    var it2=P.hand[best.h];
-    putTile(P,it2,best.mask,best.r,best.c);
-    P.hand.splice(best.h,1);
-    S.fresh={r:best.r,c:best.c};
-    S.mode="place";
-    return true;
-  }
-  return false;
+function scheduleBot(){
+  clearTimeout(botTimer);botTimer=null;
+  if(S.started&&!S.paused&&!S.over&&S.mode==="bot"&&S.turn==="bot")botTimer=setTimeout(botTurn,450);
 }
 function botTurn(){
   botTimer=null;
-  if(!S.started||S.paused||S.over||S.turn!=="bot") return;
-  var P=S.bot;
-  S.fresh=null; S.mode=null; S.used=0; P.tookRoad=false;
-  var acted=0;
-  for(var i=0;i<2;i++){
-    if(botAct(P)) acted++; else break;
-    if(gameShouldEnd()){ finish(); return; }
-  }
-  S.mode=null; S.used=0; P.tookRoad=false;
-  if(gameShouldEnd()){ finish(); return; }
-  S.turn="you";
-  render(acted?"":"Ada passed. ");
+  if(!S.started||S.paused||S.over||S.mode!=="bot"||S.turn!=="bot")return;
+  var move=chooseBotMove("bot");
+  if(move)commitPlacement(move,move.r,move.c);else passTurn();
 }
 
-/* ===================== finish ===================== */
-function finish(){
-  clearTimeout(botTimer); botTimer=null;
-  S.over=true;
-  S.inspect=null; S.selected=null;
-  var a=score(S.you), b=score(S.bot);
-  function block(label,f){
-    var h='<div class="scoreline"><span style="color:var(--ink)"><b>'+label+'</b></span><span>'+f.total+'</span></div>';
-    h+='<div class="scoreline"><span>Residential</span><span>'+f.housePts+'</span></div>'+
-       '<div class="scoreline"><span>Shopping districts</span><span>'+f.shopPts+'</span></div>'+
-       '<div class="scoreline"><span>Employment</span><span>'+f.industryPts+'</span></div>'+
-       '<div class="scoreline"><span>Hospital</span><span>'+f.hospitalPts+'</span></div>';
-    return h+'<div style="height:12px"></div>';
+/* ===================== contextual rules and overlays ===================== */
+function ruleText(type,owner){
+  var g=GAME_CONFIG;
+  var rules={
+    house:"+"+g.houseAccommodation+" Accommodation. No inherent Attraction.",
+    apartment:"+"+g.apartmentAccommodation+" Accommodation only with your Park AND Shop on adjacent edges. Otherwise 0.",
+    park:"+"+g.parkAttraction+" Attraction TOTAL if adjacent to at least one of your Houses. Apartments do not activate Parks.",
+    shop:"Connected groups: 1 Shop = +"+g.shops.one+", 2 = +"+g.shops.two+", 3+ = +"+g.shops.threePlus+" Attraction per group. Edges only.",
+    industrial:"+"+g.industryAttraction+" Attraction if no House of yours is within "+g.industryHouseRange+" spaces. Otherwise 0.",
+    school:"+"+g.schoolAttractionPerHouse+" Attraction per House of yours within "+g.schoolRange+" spaces. Recalculates as your town grows.",
+    hospital:"Locks at half your current Population, rounded down, up to +"+g.hospitalMaxAttraction+" Attraction.",
+    sports:"+"+g.sportsAttractionPerType+" Attraction per different building type of yours within "+g.sportsRange+" spaces of its footprint, up to +"+g.sportsMaxAttraction+". Occupies "+g.sportsFootprint+" × "+g.sportsFootprint+".",
+    road:"Rotate to match every touching road edge. Must connect to your own network; opponent roads cannot provide access.",
+    entrance:"Your starting T-intersection. Buildings must touch a road belonging to their own player."
+  };
+  var text=rules[type]||"";
+  if(type==="hospital"&&owner)text+=" Would currently provide +"+hospitalValue(calculateTown(owner).population)+" Attraction.";
+  return text;
+}
+function contextualRanges(){
+  var shapes=[],target=S.preview||S.inspect,item=S.selected&&S.selected.item;
+  if(S.inspect){var q=at(S.inspect.r,S.inspect.c);if(q){var root=(q.root||S.inspect.r+","+S.inspect.c).split(",");target={r:Number(root[0]),c:Number(root[1])};item=q;}}
+  function add(t,r,c){
+    var range=t==="school"?GAME_CONFIG.schoolRange:t==="industrial"?GAME_CONFIG.industryHouseRange:t==="sports"?GAME_CONFIG.sportsRange:1;
+    if(["school","industrial","sports","apartment","park"].indexOf(t)>=0)shapes.push({type:t,r:r,c:c,range:range});
   }
-  document.getElementById("overtitle").textContent =
-    a.total>b.total?"You win":a.total<b.total?"Ada wins":"A dead heat";
-  var avg=a.houses?(a.housePts/a.houses):0;
-  var best=0;
-  each(function(r,c,q){
-    if(q&&isHome(q.type)&&q.owner==="you"){
-      var hp=homeScore(r,c,"you").points;
-      if(hp>best) best=hp;
-    }
+  if(item&&target)add(item.type,target.r,target.c);
+  if(item&&item.type==="house")townTiles(S.inspect?item.owner:S.turn).forEach(function(t){if(t.type==="school"||t.type==="industrial")add(t.type,t.r,t.c);});
+  return shapes;
+}
+function inOverlay(shapes,r,c){
+  return shapes.some(function(t){
+    if(t.type==="apartment"||t.type==="park")return Math.abs(t.r-r)+Math.abs(t.c-c)===1;
+    return tileDistance(t,r,c)<=t.range;
   });
-  document.getElementById("overbody").innerHTML =
-    '<p>No legal placements remain for either player. '+SIZE+' × '+SIZE+' map.</p>'+
-    block("You",a)+block("Ada",b)+
-    '<p style="font-size:13px;color:var(--ink-soft);margin:0">'+a.houses+' homes, averaging '+avg.toFixed(1)+'. Best: '+best+'.</p>';
-  var d=document.getElementById("over");
-  if(typeof d.showModal==="function"&&!d.open){ d.showModal(); }
-  render();
 }
 
-/* ===================== render ===================== */
-/* The board holds ~30k SVG rects. Rebuilding it every render churned enough
-   memory to crash the tab on mobile, so the cells are created once and each
-   one is only repainted when its contents actually change. */
-var cellEls=null;
+/* ===================== existing cached board renderer ===================== */
 function ensureBoard(){
-  if(cellEls) return;
-  var board=document.getElementById("board");
-  board.innerHTML="";
-  cellEls=[];
-  for(var r=0;r<SIZE;r++){
-    for(var c=0;c<SIZE;c++){
-      (function(r,c){
-        var b=document.createElement("button");
-        b.type="button"; b.className="cell"; b.dataset.sig="";
-        b.addEventListener("click",function(){
-          var item=(S.selected!==null&&canPlace())?S.you.hand[S.selected]:null;
-          if(item&&legalFor(item,r,c,"you")){ place(r,c); }
-          else { S.inspect=S.grid[r][c]?{r:r,c:c}:null; render(); }
-        });
-        cellEls.push(b);
-        board.appendChild(b);
-      })(r,c);
-    }
-  }
+  if(cellEls)return;
+  var board=document.getElementById("board");board.innerHTML="";cellEls=[];
+  for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++)(function(r,c){
+    var b=document.createElement("button");b.type="button";b.className="cell";b.dataset.sig="";
+    b.addEventListener("click",function(){
+      if(S.selected&&humanTurn()&&legalFor(S.selected.item,r,c,S.turn))stagePlacement(r,c);
+      else {S.inspect=at(r,c)?{r:r,c:c}:null;S.preview=null;render();}
+    });cellEls.push(b);board.appendChild(b);
+  })(r,c);
 }
 function paintBoard(){
-  var item=(S.selected!==null&&canPlace())?S.you.hand[S.selected]:null;
-  var i=0;
-  for(var r=0;r<SIZE;r++){
-    for(var c=0;c<SIZE;c++,i++){
-      var b=cellEls[i], q=S.grid[r][c];
-      var sig = ART_STYLE+":"+(q ? q.type+":"+q.mask+":"+q.v+":"+q.owner+":"+(q.upgraded?1:0) : "grass:"+S.land[r][c]);
-      var tall = !!q && q.type==="apartment";
-      if(b.dataset.sig!==sig){
-        b.innerHTML = q ? sprite(q.type,q.mask,q.v)+(q.upgraded?'<i class="upgrade-mark">+</i>':'') : sprite("grass",0,S.land[r][c]);
-        b.dataset.sig=sig;
-        b.setAttribute("aria-label", q
-          ? (q.owner==="you"?"Your ":"Ada's ")+(q.upgraded?"upgraded ":"")+NAMES[q.type]+" row "+(r+1)+" column "+(c+1)
-          : "Empty plot row "+(r+1)+" column "+(c+1));
-      }
-      var legal=item?legalFor(item,r,c,"you"):false;
-      b.classList.toggle("tall",tall);
-      b.classList.toggle("empty",!q);
-      b.classList.toggle("legal",legal);
-      b.classList.toggle("own-you",!!q&&q.owner==="you");
-      b.classList.toggle("own-bot",!!q&&q.owner==="bot");
-      b.classList.toggle("fresh",!!(S.fresh&&S.fresh.r===r&&S.fresh.c===c));
-      b.classList.toggle("inspect",!!(S.inspect&&S.inspect.r===r&&S.inspect.c===c));
-    }
-  }
+  var item=humanTurn()&&S.selected?S.selected.item:null,shapes=contextualRanges();
+  var footprint=S.preview&&item?cellsFor(item.type,S.preview.r,S.preview.c):[];
+  each(function(r,c,q){
+    var b=cellEls[r*SIZE+c],sig=ART_STYLE+":"+(q?q.type+":"+q.mask+":"+q.v+":"+q.owner:"grass:"+S.land[r][c]);
+    if(b.dataset.sig!==sig){b.innerHTML=(q?sprite(q.type,q.mask,q.v):sprite("grass",0,S.land[r][c]))+'<span class="range-mark" aria-hidden="true"></span>';b.dataset.sig=sig;}
+    b.setAttribute("aria-label",q?playerName(q.owner)+" — "+NAMES[q.type]+" row "+(r+1)+" column "+(c+1):"Empty plot row "+(r+1)+" column "+(c+1));
+    var legal=!!item&&legalFor(item,r,c,S.turn);
+    b.classList.toggle("tall",!!q&&q.type==="apartment");b.classList.toggle("empty",!q);b.classList.toggle("legal",legal);
+    b.classList.toggle("own-you",!!q&&q.owner==="you");b.classList.toggle("own-bot",!!q&&q.owner==="bot");
+    b.classList.toggle("fresh",!!(S.fresh&&S.fresh.r===r&&S.fresh.c===c));
+    b.classList.toggle("inspect",!!(S.inspect&&S.inspect.r===r&&S.inspect.c===c));
+    b.classList.toggle("in-range",inOverlay(shapes,r,c));
+    b.classList.toggle("proposed",footprint.some(function(p){return p[0]===r&&p[1]===c;}));
+    b.title=q?ruleText(q.type):legal?"Click to preview; confirm before placing.":"";
+  });
 }
-function render(prefix){
-  var P=S.you;
-  var item=(S.selected!==null&&canPlace())?P.hand[S.selected]:null;
-  ensureBoard();
-  fitBoard();
-  paintBoard();
-
-  var mk=document.getElementById("market");
-  mk.innerHTML="";
-  if(!S.market.length){
-    mk.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Market empty \u2014 the deck is done. Place what you can.</div>';
+function makeTileButton(choice,owner){
+  var item=choice.item,b=document.createElement("button");b.type="button";
+  b.className="tile"+(item.type==="apartment"?" tall":"")+(S.selected&&S.selected.source===choice.source&&S.selected.index===choice.index?" sel":"");
+  b.innerHTML=sprite(item.type,item.mask,item.v,true);
+  var name=item.type==="road"?SHAPE_NAME[item.mask]+" road":NAMES[item.type];
+  b.title=name+" — "+ruleText(item.type,owner);b.setAttribute("aria-label","Select "+name);
+  b.disabled=!humanTurn();b.addEventListener("click",function(){selectTile(choice.source,choice.index);});return b;
+}
+function statLines(town){return '<div class="scoreline"><span>Accommodation</span><span>'+town.accommodation+'</span></div>'+ '<div class="scoreline"><span>Attraction</span><span>'+town.attraction+'</span></div>'+ '<div class="scoreline population"><span>Population</span><span>'+town.population+'</span></div>';}
+function breakdownHTML(owner){
+  var town=calculateTown(owner),b=town.breakdown;
+  var labels={houses:"Houses",apartments:"Apartments",parks:"Parks",shops:"Shop groups",industry:"Industry",school:"School",hospital:"Hospital (locked)",sports:"Sports Ground"};
+  var h='<h3>'+playerName(owner)+'</h3><b>Accommodation</b>';
+  ["houses","apartments"].forEach(function(k){h+='<div class="scoreline"><span>'+labels[k]+'</span><span>'+b[k]+'</span></div>';});
+  h+='<b>Attraction</b>';
+  ["parks","shops","industry","school","hospital","sports"].forEach(function(k){h+='<div class="scoreline"><span>'+labels[k]+'</span><span>'+b[k]+'</span></div>';});
+  return h+statLines(town);
+}
+function renderPreview(){
+  var el=document.getElementById("placementpreview"),p=S.preview;
+  el.hidden=!p;
+  if(!p){el.innerHTML="";return;}
+  var h='<b>'+NAMES[S.selected.item.type]+' · row '+(p.r+1)+', column '+(p.c+1)+'</b><table><tr><th>Town</th><th>Now</th><th>After</th></tr>';
+  ["accommodation","attraction","population"].forEach(function(k){h+='<tr><td>'+k.charAt(0).toUpperCase()+k.slice(1)+'</td><td>'+p.before[k]+'</td><td>'+p.after[k]+'</td></tr>';});
+  h+='</table>';
+  if(S.selected.item.type==="hospital")h+='<p>Locks at +'+hospitalValue(p.before.population)+' Attraction.</p>';
+  p.changes.forEach(function(change){h+='<p>'+NAMES[change.type]+' ('+change.key.split(",").map(function(n){return Number(n)+1;}).join(", ")+'): '+change.from+' → '+change.to+'. '+change.detail+'.</p>';});
+  if(S.selected.item.type!=="road"){
+    putTile(S.turn,S.selected.item,p.r,p.c);var ends=openEnds(S.turn);clearTile(S.selected.item.type,p.r,p.c);
+    if(!ends)h+='<p><b>This closes your last road exit.</b></p>';
   }
-  S.market.forEach(function(it,i){
-    var b=document.createElement("button");
-    b.type="button"; b.className="tile"+(it.type==="apartment"?" tall":"");
-    b.innerHTML=sprite(it.type,0,it.v,true);
-    b.title=NAMES[it.type];
-    b.setAttribute("aria-label","Take "+NAMES[it.type]);
-    if(!canTake()||!canTakeTile(S.you,it.type)) b.disabled=true;
-    b.addEventListener("click",function(){ take(i); });
-    mk.appendChild(b);
+  el.innerHTML=h;
+}
+function render(){
+  ensureBoard();fitBoard();paintBoard();
+  var owner=S.turn,item=S.selected&&S.selected.item;
+  ["you","bot"].forEach(function(who){
+    var box=document.getElementById("town-"+who);box.innerHTML='<b>'+playerName(who)+(S.turn===who&&!S.over?' · Active':'')+'</b>'+statLines(calculateTown(who));
+    box.classList.toggle("active-town",S.turn===who&&!S.over);
   });
-
-  var rr=document.getElementById("roadrow");
-  rr.innerHTML="";
-  if(S.roads.length){
-    var top=S.roads[S.roads.length-1];
-    var rb=document.createElement("button");
-    rb.type="button"; rb.className="tile";
-    rb.innerHTML=sprite("road",top,0)+'<span class="count">'+S.roads.length+'</span>';
-    rb.title="Road \u2014 "+SHAPE_NAME[top];
-    rb.setAttribute("aria-label","Take the top road, a "+SHAPE_NAME[top]+". "+S.roads.length+" left");
-    if(!canTake()||P.tookRoad) rb.disabled=true;
-    rb.addEventListener("click",function(){ take("road"); });
-    rr.appendChild(rb);
-    var hint=document.createElement("div");
-    hint.style.cssText="font-size:12.5px;color:var(--ink-soft);max-width:19ch";
-    hint.textContent="Next road: "+SHAPE_NAME[top]+". One road per take turn.";
-    rr.appendChild(hint);
-  } else {
-    rr.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Road stack empty.</div>';
-  }
-
-  var hd=document.getElementById("hand");
-  hd.innerHTML="";
-  if(!P.hand.length){
-    hd.innerHTML='<div style="font-size:13px;color:var(--ink-soft)">Nothing in hand.</div>';
-  }
-  P.hand.forEach(function(it,i){
-    var b=document.createElement("button");
-    b.type="button";
-    b.className="tile"+(S.selected===i?" sel":"")+(isCivic(it.type)?" must":"")+
-      (it.type==="apartment"?" tall":"");
-    b.innerHTML=sprite(it.type,it.mask,it.v,true);
-    b.title=it.type==="road"?"Road \u2014 "+SHAPE_NAME[it.mask]:NAMES[it.type];
-    b.setAttribute("aria-label",(S.selected===i?"Selected ":"Select ")+(it.type==="road"?SHAPE_NAME[it.mask]+" road":NAMES[it.type]));
-    if(!canPlace()) b.disabled=true;
-    b.addEventListener("click",function(){
-      S.selected=(S.selected===i?null:i); S.inspect=null; render();
-    });
-    hd.appendChild(b);
-  });
-
-  var a=score(S.you), bs=score(S.bot);
-  var vy=document.getElementById("vsyou"), vb=document.getElementById("vsbot");
-  vy.querySelector(".num").textContent=a.total;
-  vb.querySelector(".num").textContent=bs.total;
-  vy.classList.toggle("behind",a.total<bs.total);
-  vb.classList.toggle("behind",bs.total<a.total);
-  var enough=a.jobs>=a.citizens;
-  var bd='<div class="scoreline"><span>Residential ('+a.houses+')</span><span>'+a.housePts+'</span></div>'+
-         '<div class="scoreline"><span>Shopping districts</span><span>'+a.shopPts+'</span></div>'+
-         '<div class="scoreline"><span>Employment</span><span>'+a.industryPts+'</span></div>'+
-         '<div class="scoreline '+(a.hospitalActive?'good':'warn')+'"><span>Hospital</span><span>'+a.hospitalPts+'</span></div>'+
-         '<div class="scoreline '+(enough?'good':'warn')+'"><span>Jobs for people</span><span>'+
-           a.jobs+' / '+a.citizens+'</span></div>';
-  document.getElementById("breakdown").innerHTML=bd;
-
-  var msg=prefix||"";
-  var mayPass=canPass(P);
-  if(!S.started){
-    msg="Choose a map size to start.";
-  } else if(!S.over&&S.turn==="you"&&mayPass){
-    msg+="No moves available. Pass to let Ada continue.";
-  } else if(S.over&&!S.inspect){
-    msg+="Game over. Tap a tile to inspect it. Results for scores.";
-  } else if(S.turn==="bot"&&!S.inspect){
-    msg+="Ada's turn.";
-  } else if(S.inspect){
-    var iq=S.grid[S.inspect.r][S.inspect.c];
-    var mine=iq.owner==="you";
-    var whose=mine?"Yours":"Ada's";
-    if(isHome(iq.type)){
-      var hs=homeScore(S.inspect.r,S.inspect.c,iq.owner);
-      msg="<b>"+NAMES[iq.type]+" ("+whose+") \u2014 "+hs.points+"</b><br>"+
-          hs.plus.concat(hs.minus).join(" \u00b7 ")+
-          (iq.upgraded?"<br>Upgraded: 3 citizens and +2 residential points.":"");
-    } else if(isRoad(iq.type)){
-      msg="<b>"+NAMES[iq.type]+" ("+whose+", "+(SHAPE_NAME[iq.mask]||"junction")+")</b><br>"+
-          (mine?"Your road. Buildings may touch it.":"Ada's road. You cannot build off it.");
-    } else if(iq.type==="industrial"){
-      var inds=score(iq.owner==="you"?S.you:S.bot);
-      msg="<b>Industrial ("+whose+")</b><br>"+
-          (mine?"6 jobs, any distance. Employment is worth +1 per 2 employed citizens ("+inds.industryPts+" now). \u22123 to your homes within 2."
-               :"Ada's. No effect on your houses.");
-    } else if(iq.type==="sports"){
-      msg="<b>Sports centre ("+whose+")</b><br>"+
-          (mine?"+3 to your houses within 3. Covers 2\u00d72."
-               :"Ada's. No effect on your houses.");
-    } else if(iq.type==="school"){
-      var dead=near(S.inspect.r,S.inspect.c,2,"industrial",iq.owner);
-      msg="<b>School ("+whose+")</b><br>"+
-          (mine?(dead?"Industry within 2. Gives nothing."
-                     :"Homes within 2 get +3; homes outside all active catchments get \u22121. Catchments never stack.")
-               :"Ada's. No effect on your houses.");
-    } else if(iq.type==="hospital"){
-      var hosp=score(iq.owner==="you"?S.you:S.bot);
-      msg="<b>Hospital ("+whose+")</b><br>"+
-          (mine?(hosp.hospitalActive?"Active: 10+ citizens. Worth 8 points.":hosp.citizens+" / 10 citizens. Worth 0 points.")
-               :"Ada's. No effect on your houses.");
-    } else if(iq.type==="park"){
-      msg="<b>Park ("+whose+")</b><br>"+
-          (mine?"+1 to your homes within 1.":"Ada's. No effect on your houses.");
-    } else {
-      var district=shopDistrictAt(S.inspect.r,S.inspect.c,iq.owner);
-      msg="<b>Shop ("+whose+")</b><br>"+
-          (mine?district.size+" orthogonally connected shop"+(district.size===1?"":"s")+". District worth "+district.points+" points.":"Ada's. Only orthogonally connected shops in the same town form a district.");
-    }
-  } else if(item){
-    msg += item.type==="road"
-      ? "Rotate to match the ends, then tap a marked plot."
-      : item.type==="upgrade"
-      ? "Tap one of your marked houses to upgrade it."
-      : "Tap a marked plot.";
-  } else if(S.mode==="take"){ msg+="Taking. One more tile, or end turn.";
-  } else if(S.mode==="place"){ msg+="Placing. One more tile, or end turn.";
-  } else { msg+="Take two tiles, or place two."; }
-  document.getElementById("status").innerHTML=msg;
-
-  document.getElementById("rotate").disabled=!(item&&item.type==="road");
-  document.getElementById("endturn").disabled=!S.started||S.paused||S.over||S.turn!=="you"||(S.used===0&&!mayPass);
-  document.getElementById("endturn").textContent=mayPass&&S.used===0?"Pass":"End turn";
+  document.getElementById("winrule").textContent="Target: "+GAME_CONFIG.winPopulation+" Population";
+  var market=document.getElementById("market");market.innerHTML="";
+  S.market.forEach(function(it,i){market.appendChild(makeTileButton({source:"market",index:i,item:it},owner));});
+  if(!S.market.length)market.textContent="Normal tile supply exhausted.";
+  document.getElementById("marketcount").textContent="Shared market · "+S.deck.length+" tiles left in supply";
+  var civics=document.getElementById("civics");civics.innerHTML="";
+  S[owner].civics.forEach(function(it,i){civics.appendChild(makeTileButton({source:"civic",index:i,item:it},owner));});
+  if(!S[owner].civics.length)civics.textContent="All three Civic Tiles have been used.";
+  document.getElementById("civiclabel").textContent=playerName(owner)+" · unused Civic Tiles";
+  document.getElementById("hospitalhint").textContent=S[owner].civics.some(function(it){return it.type==="hospital";})?"Hospital would currently lock at +"+hospitalValue(calculateTown(owner).population)+" Attraction.":"";
+  var mayPass=canPass(owner),msg;
+  if(!S.started)msg="Choose players and start a new town.";
+  else if(S.over)msg="Game over. Inspect any building, view Results, or Undo.";
+  else if(S.paused)msg="Game paused.";
+  else if(!humanTurn())msg="Ada is choosing a tile…";
+  else if(mayPass)msg=playerName(owner)+": no legal tiles available. Pass your turn.";
+  else if(item)msg=playerName(owner)+": "+(S.preview?"Review the preview, then Confirm placement.":"Select a marked plot to preview "+NAMES[item.type]+".");
+  else msg=playerName(owner)+": choose one market tile or an unused Civic Tile.";
+  if(S.finalTurn&&!S.over)msg="Final turn for "+playerName("bot")+" — Player 1 reached the target. "+msg;
+  document.getElementById("status").textContent=msg;
+  var info="";
+  if(S.inspect){
+    var q=at(S.inspect.r,S.inspect.c);
+    if(q){var key=q.root||S.inspect.r+","+S.inspect.c,e=calculateTown(q.owner).effects[key];
+      info='<b>'+NAMES[q.type]+' · '+playerName(q.owner)+'</b><br>'+ruleText(q.type)+(e?'<br><b>'+e.value+' '+e.kind+'</b> · '+e.detail:"");}
+  } else if(item)info='<b>'+NAMES[item.type]+'</b><br>'+ruleText(item.type,owner);
+  if(info&&contextualRanges().length)info+='<br><small>Amber squares show the selected range or adjacency requirements.</small>';
+  document.getElementById("tileinfo").innerHTML=info;
+  document.getElementById("tileinfo").hidden=!info;
+  document.getElementById("rotate").disabled=!humanTurn()||!item||item.type!=="road";
+  document.getElementById("confirm").disabled=!humanTurn()||!S.preview;
+  document.getElementById("cancelplacement").disabled=!humanTurn()||!S.selected;
+  document.getElementById("endturn").disabled=!humanTurn()||!mayPass;
+  document.getElementById("undo").disabled=!S.started||S.paused||!moveHistory.length;
   document.getElementById("finish").disabled=!S.over;
-  var empty=0;
-  each(function(r,c,q){ if(!q) empty++; });
-  document.getElementById("mapinfo").textContent=SIZE+" × "+SIZE+" map · "+empty+" empty plots";
+  renderPreview();
+  document.getElementById("breakdown").innerHTML=breakdownHTML("you")+breakdownHTML("bot");
+  var empty=0;each(function(r,c,q){if(!q)empty++;});
+  document.getElementById("mapinfo").textContent=SIZE+" × "+SIZE+" · "+empty+" empty plots · Turns "+S.you.turns+" / "+S.bot.turns+" · Seed: "+S.seed;
 }
-
-/* ===================== legend and art style ===================== */
+function showResults(){
+  if(!S.over||!S.result)return;
+  document.getElementById("overtitle").textContent=S.result.winner?playerName(S.result.winner)+" wins":"Draw";
+  document.getElementById("overbody").innerHTML='<p>'+(S.result.reason==="target"?"Both players have had equal turns. Highest Population wins.":"Neither player can place an available market or Civic Tile. Highest Population wins.")+'</p><h3>'+playerName("you")+'</h3>'+statLines(calculateTown("you"))+'<h3>'+playerName("bot")+'</h3>'+statLines(calculateTown("bot"));
+  var d=document.getElementById("over");if(!d.open)d.showModal();
+}
 function renderLegend(){
-  var rows=[
-    ["house",0,0,"House","2 citizens. Worth <b>1</b> point, then:<br>"+
-      "<b>+1</b> park within 1<br>"+
-      "<b>+3</b> sports centre within 3<br>"+
-      "<b>+3</b> inside an active school catchment, or <b>\u22121</b> outside<br>"+
-      "<b>\u22123</b> industry within 2<br>"+
-      "Never below 0."],
-    ["apartment",0,0,"Apartment block","4 citizens, so it needs 4 jobs.<br>"+
-      "Scores <b>double</b> whatever a house on that tile would score.<br>"+
-      "<b>0</b> unless a park <i>and</i> a shop are directly next to it."],
-    ["park",0,0,"Park","<b>+1</b> to each of your homes within 1."],
-    ["shop",0,0,"Shop","Orthogonal districts: 1 / 2 / 3 / 4 shops score <b>0 / 2 / 7 / 12</b>. Each extra shop adds 5."],
-    ["industrial",0,0,"Industrial","<b>6 jobs</b>, at any distance.<br>"+
-      "A house needs 2, an apartment 4 \u2014 one factory covers three houses.<br>"+
-      "<b>+1</b> per 2 employed citizens. <b>\u22123</b> to each home within 2."],
-    ["sports",0,0,"Sports centre","<b>+3</b> to each of your houses within 3.<br>Occupies 2\u00d72. One per player."],
-    ["school",0,0,"School","Homes within 2 get <b>+3</b>; homes outside all active catchments get <b>\u22121</b>.<br>Catchments never stack. Gives nothing if industry is within 2. One per player."],
-    ["hospital",0,0,"Hospital","<b>0</b> below 10 citizens; <b>8</b> at 10+ citizens. One per player."],
-    ["upgrade",0,0,"House upgrade","Place on one of your houses. It gains <b>+2</b> residential points and holds <b>3 citizens</b> instead of 2.<br>Each house can be upgraded once."],
-    ["road",7,0,"Road","No points. Every building must touch one of your roads.<br>Where two of your roads meet, the open ends must match."]
-  ];
-  document.getElementById("legend").innerHTML=
-    '<p class="note">Distance is measured as a square, with diagonals included. Connected shops must share an edge. Only your own tiles count.</p>'+
-    rows.map(function(row){
-      var art=sprite(row[0],row[1],row[2],true);
-      if(row[0]==="apartment") art=art.replace("<svg ","<svg class=\"tall\" ");
-      return '<div>'+art+'<span><b>'+row[3]+'</b><br>'+row[4]+'</span></div>';
-    }).join("");
+  var types=["house","apartment","park","shop","industrial","school","hospital","sports","road"];
+  document.getElementById("legend").innerHTML='<p class="note"><b>Population = min(Accommodation, Attraction).</b> Target: '+GAME_CONFIG.winPopulation+'. Player 2 gets a final turn if Player 1 reaches the target first.</p><p class="note">'+(GAME_CONFIG.distanceMetric==="manhattan"?"Ranges count orthogonal grid steps (Manhattan): diagonal offsets cost two steps.":"Ranges use square distance: diagonals count as one step.")+' Adjacency and Shop connections always require a shared edge. Only your own buildings count. Sports range starts at the nearest square of its '+GAME_CONFIG.sportsFootprint+' × '+GAME_CONFIG.sportsFootprint+' footprint.</p>'+types.map(function(type){
+    var art=sprite(type,type==="road"?7:0,0,true);
+    if(type==="apartment")art=art.replace('<svg class="pixel-sprite"','<svg class="pixel-sprite tall"');
+    return '<div>'+art+'<span><b>'+NAMES[type]+'</b><br>'+ruleText(type)+'</span></div>';
+  }).join("")+'<p>One tile per turn. Select, preview, confirm. You may pass only when no available tile fits. If neither player can place, highest Population wins.</p>';
 }
 function setArtStyle(style){
-  if(style!=="pixel"&&style!=="illustrated") return;
-  ART_STYLE=style;
-  if(document.documentElement) document.documentElement.setAttribute("data-art",style);
-  var picker=document.getElementById("artstyle");
-  if(picker) picker.value=style;
-  try{ if(window.localStorage) window.localStorage.setItem("dusk-town-art-style",style); }catch(ignoreArtStorage){}
-  if(cellEls){ cellEls.forEach(function(el){ el.dataset.sig=""; }); }
-  renderLegend();
-  if(S) render();
+  if(style!=="pixel"&&style!=="illustrated")return;
+  ART_STYLE=style;if(document.documentElement)document.documentElement.setAttribute("data-art",style);
+  document.getElementById("artstyle").value=style;
+  try{if(window.localStorage)window.localStorage.setItem("dusk-town-art-style",style);}catch(ignoreArtStorage){}
+  if(cellEls)cellEls.forEach(function(el){el.dataset.sig="";});renderLegend();if(S)render();
 }
-var artPicker=document.getElementById("artstyle");
-artPicker.value=ART_STYLE;
-artPicker.addEventListener("change",function(){ setArtStyle(this.value); });
-renderLegend();
-
-/* The 1px grid lines only stay even if every cell is a whole number of
-   pixels, so the track size is computed rather than left to fractions. */
 function fitBoard(){
-  var col=document.querySelector(".boardcol");
-  var board=document.getElementById("board");
-  if(!col||!board) return;
-  var avail=col.clientWidth;
-  if(!avail) return;
-  var chrome=ART_STYLE==="illustrated" ? 12+2*(SIZE-1) : 8+(SIZE-1);
-  var cell=Math.floor((avail-chrome)/SIZE);
-  cell=Math.max(14,Math.min(46,cell));
-  board.style.setProperty("--cellpx",cell+"px");
+  var col=document.querySelector(".boardcol"),board=document.getElementById("board");if(!col||!board||!col.clientWidth)return;
+  var chrome=ART_STYLE==="illustrated"?12+2*(SIZE-1):8+(SIZE-1);
+  board.style.setProperty("--cellpx",Math.max(14,Math.min(46,Math.floor((col.clientWidth-chrome)/SIZE)))+"px");
 }
-window.addEventListener("resize",fitBoard);
-if(window.visualViewport) window.visualViewport.addEventListener("resize",fitBoard);
-fitBoard();
-
 function doRotate(){
-  if(S.selected===null||!canPlace()) return;
-  var it=S.you.hand[S.selected];
-  if(it.type!=="road") return;
-  it.mask=rotateMask(it.mask);
-  render();
+  if(!humanTurn()||!S.selected||S.selected.item.type!=="road")return;
+  S.selected.item.mask=rotateMask(S.selected.item.mask);S.preview=null;render();
 }
-document.getElementById("rotate").addEventListener("click",doRotate);
-document.getElementById("endturn").addEventListener("click",function(){
-  if(S.turn==="you"&&(S.used>0||canPass(S.you))) endTurn();
-});
-document.getElementById("finish").addEventListener("click",function(){ if(S.over) finish(); });
 function showSetup(){
-  clearTimeout(botTimer); botTimer=null;
-  S.paused=true;
-  document.getElementById("over").close();
-  document.getElementById("mapsize").value=String(SIZE);
-  document.getElementById("cancelsetup").hidden=!S.started;
-  render();
+  clearTimeout(botTimer);botTimer=null;S.paused=true;document.getElementById("over").close();
+  document.getElementById("playmode").value=S.mode;document.getElementById("gameseed").value=S.started?S.seed:"";
+  document.getElementById("cancelsetup").hidden=!S.started;render();
+  document.getElementById("setupsummary").textContent=GAME_CONFIG.boardSize+" × "+GAME_CONFIG.boardSize+" shared board. Target: "+GAME_CONFIG.winPopulation+" Population. Each player starts with a House, a T-intersection and three personal Civic Tiles.";
   document.getElementById("setup").showModal();
 }
-function closeSetup(){
-  if(!S.started) return;
-  document.getElementById("setup").close();
-  S.paused=false;
-  render();
-  if(S.turn==="bot"&&!S.over) botTimer=setTimeout(botTurn,480);
-}
+function closeSetup(){if(!S.started)return;document.getElementById("setup").close();S.paused=false;render();scheduleBot();}
+window.addEventListener("resize",fitBoard);
+if(window.visualViewport)window.visualViewport.addEventListener("resize",fitBoard);
+document.getElementById("artstyle").value=ART_STYLE;
+document.getElementById("artstyle").addEventListener("change",function(){setArtStyle(this.value);});
+document.getElementById("rotate").addEventListener("click",doRotate);
+document.getElementById("confirm").addEventListener("click",confirmPlacement);
+document.getElementById("cancelplacement").addEventListener("click",function(){S.selected=null;S.preview=null;S.inspect=null;render();});
+document.getElementById("endturn").addEventListener("click",function(){if(humanTurn())passTurn();});
+document.getElementById("undo").addEventListener("click",undoMove);
+document.getElementById("finish").addEventListener("click",showResults);
 document.getElementById("restart").addEventListener("click",showSetup);
-document.getElementById("startgame").addEventListener("click",function(){
-  newGame(document.getElementById("mapsize").value);
-});
-document.getElementById("cancelsetup").addEventListener("click",closeSetup);
-document.getElementById("setup").addEventListener("cancel",function(ev){
-  ev.preventDefault(); closeSetup();
-});
-document.getElementById("viewmap").addEventListener("click",function(){
-  var d=document.getElementById("over");
-  if(d.open) d.close();
-  document.getElementById("board").scrollIntoView({block:"start"});
-});
-document.getElementById("over").addEventListener("click",function(ev){
-  if(ev.target===this) this.close();   // tap the backdrop to get the map back
-});
 document.getElementById("again").addEventListener("click",showSetup);
-document.addEventListener("keydown",function(ev){
-  if(ev.key==="r"||ev.key==="R") doRotate();
-});
-
-newGame();
-S.started=false;
-showSetup();
+document.getElementById("cancelsetup").addEventListener("click",closeSetup);
+document.getElementById("setup").addEventListener("cancel",function(ev){ev.preventDefault();closeSetup();});
+document.getElementById("startgame").addEventListener("click",function(){newGame({mode:document.getElementById("playmode").value,seed:document.getElementById("gameseed").value});});
+document.getElementById("viewmap").addEventListener("click",function(){document.getElementById("over").close();document.getElementById("board").scrollIntoView({block:"start"});});
+document.getElementById("logtown").addEventListener("click",function(){console.log("Dusk Town",{seed:S.seed,you:calculateTown("you"),player2:calculateTown("bot")});});
+document.addEventListener("keydown",function(ev){if((ev.key==="r"||ev.key==="R")&&!S.paused)doRotate();});
+newGame({mode:"local"});S.started=false;showSetup();
 </script>
 </body>
 </html>
