@@ -48,6 +48,14 @@ test('three-building market excludes roads and civics; separate stack contains o
   assert.equal(game.choices('you').filter(c=>c.source==='road').length,1);
   assert.ok(supply.every(t=>!['school','sports','hospital','upgrade'].includes(t.type)));
 });
+test('a turn is either two takes or two placements, never a mixed turn',()=>{
+  start();
+  game.takeChoice('market',0);assert.equal(game.S.mode,'take');assert.equal(game.S.used,1);assert.equal(game.S.you.hand.length,1);assert.equal(game.S.turn,'you');
+  game.takeChoice('market',0);assert.equal(game.S.turn,'bot');assert.equal(game.S.you.turns,1);assert.equal(game.S.you.hand.length,2);
+  game.S.turn='you';game.S.mode=null;game.S.used=0;game.S.you.hand=[{type:'house',mask:0,v:0},{type:'house',mask:0,v:0}];
+  game.selectTile('hand',0);game.stagePlacement(12,5);game.confirmPlacement();assert.equal(game.S.mode,'place');assert.equal(game.S.used,1);
+  game.selectTile('hand',0);game.stagePlacement(12,7);game.confirmPlacement();assert.equal(game.S.turn,'bot');assert.equal(game.S.you.turns,2);
+});
 test('road placement consumes only the separate stack and reveals its next tile',()=>{
   start();const before=game.S.roads.length;const choice=game.choices('you').find(c=>c.source==='road');
   let placement=null;game.eachPlacement('you',choice.item,(item,r,c)=>{placement={item,r,c};return false;});

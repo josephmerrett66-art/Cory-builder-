@@ -50,18 +50,21 @@ are not part of that market: they use a separate shuffled stack with only its
 top road visible. The supply retains 68 normal building tiles and 60 roads, with
 quantities centralised in the configuration.
 
-1. Select one building from the three-tile market, the face-up road, or one of
-   the active player's unused Civic Tiles.
-2. Rotate a road if needed, then click a legal plot to preview it.
-3. Review Accommodation, Attraction and Population before/after, including
-   affected existing buildings. Click **Confirm placement** to commit.
-4. A building market slot refills immediately; the road stack reveals its next
-   road; a Civic Tile is consumed. The town recalculates, victory is checked,
-   and the other player takes a turn.
+Each turn has two actions of one kind. Either take two tiles into your hand, or
+place two tiles from your hand. You cannot mix taking and placing in the same
+turn.
 
-Selecting or previewing does not consume anything. You can choose another tile,
-choose another plot or cancel freely until confirmation. There is no stored hand
-or separate drawing turn. A Civic placement uses the entire normal turn.
+1. On a take turn, choose two buildings, roads, or unused personal Civic Tiles.
+   Market slots refill immediately and the separate road stack reveals its next
+   tile.
+2. On a place turn, choose tiles from your hand, rotate roads if needed, and
+   click legal plots to preview them.
+3. Review each Accommodation, Attraction and Population preview, then confirm
+   both placements. A Civic Tile is consumed when it is taken into your hand.
+
+You can cancel a selection before confirming it. A turn ends after its two take
+actions or two placement actions. A player may pass when the chosen action type
+has no legal action.
 
 Road edges must match touching road edges, including the opponent's roads, but a
 new road must connect to an **own** road. Opponent roads never provide network
@@ -74,12 +77,12 @@ The target is **40 Population**. If Player 1 reaches it, Player 2 gets one final
 turn. If Player 2 reaches it on their regular turn, both already have equal
 turn counts and the game ends immediately. Higher Population wins; ties draw.
 
-A player may pass only if none of their available building, face-up road or
-unused Civic Tiles can fit. A required final turn can be a pass. If neither
-player can place an available tile, the game ends with the higher Population
-winning. Tiles still hidden in either stack cannot be drawn without a placement,
-so they do not prevent this blocked-board ending. There is no invented market
-wipe or discard action.
+A player may pass only if the current action type has no legal action. A required
+final turn can be a pass. If neither player can place an available tile, the
+game ends with the higher Population winning. Tiles still hidden in either
+stack can still be taken on a take turn, so the blocked-board ending applies
+when no available placement remains. There is no invented market wipe or
+discard action.
 
 ## Balancing and debugging
 
