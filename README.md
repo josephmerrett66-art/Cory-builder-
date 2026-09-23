@@ -40,20 +40,24 @@ before it adds any Attraction or changes the Sports Ground's diversity bonus.
 
 ## Setup and turn sequence
 
-Each player starts with a T-intersection centred on opposite edges, an adjacent
-House, and exactly one personal School, Hospital and Sports Ground. Starting
-values are **4 Accommodation, 0 Attraction, 0 Population**.
+Each player starts with only a T-intersection centred on opposite edges. No House
+is placed automatically, so both towns begin at **0 Accommodation, 0 Attraction,
+0 Population**. Each player also has exactly one personal School, Hospital and
+Sports Ground.
 
-The shared **five-tile market includes roads and normal buildings**. Civic Tiles
-are never shuffled into it. The supply retains 68 normal building tiles and 60
-roads, with quantities centralised in the configuration.
+The shared building market shows **three face-up normal building tiles**. Roads
+are not part of that market: they use a separate shuffled stack with only its
+top road visible. The supply retains 68 normal building tiles and 60 roads, with
+quantities centralised in the configuration.
 
-1. Select one market tile or one of the active player's unused Civic Tiles.
+1. Select one building from the three-tile market, the face-up road, or one of
+   the active player's unused Civic Tiles.
 2. Rotate a road if needed, then click a legal plot to preview it.
 3. Review Accommodation, Attraction and Population before/after, including
    affected existing buildings. Click **Confirm placement** to commit.
-4. The market slot refills immediately (or the Civic Tile is consumed), the
-   town recalculates, victory is checked, and the other player takes a turn.
+4. A building market slot refills immediately; the road stack reveals its next
+   road; a Civic Tile is consumed. The town recalculates, victory is checked,
+   and the other player takes a turn.
 
 Selecting or previewing does not consume anything. You can choose another tile,
 choose another plot or cancel freely until confirmation. There is no stored hand
@@ -70,11 +74,12 @@ The target is **40 Population**. If Player 1 reaches it, Player 2 gets one final
 turn. If Player 2 reaches it on their regular turn, both already have equal
 turn counts and the game ends immediately. Higher Population wins; ties draw.
 
-A player may pass only if none of their available market or unused Civic Tiles
-can fit. A required final turn can be a pass. If neither player can place an
-available tile, the game ends with the higher Population winning. Tiles still
-hidden in the deck cannot be drawn without a placement, so they do not prevent
-this blocked-board ending. There is no invented market wipe or discard action.
+A player may pass only if none of their available building, face-up road or
+unused Civic Tiles can fit. A required final turn can be a pass. If neither
+player can place an available tile, the game ends with the higher Population
+winning. Tiles still hidden in either stack cannot be drawn without a placement,
+so they do not prevent this blocked-board ending. There is no invented market
+wipe or discard action.
 
 ## Balancing and debugging
 

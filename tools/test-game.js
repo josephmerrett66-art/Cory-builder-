@@ -9,6 +9,7 @@ function test(name,run){
   run();passed++;console.log('PASS',name);
 }
 function start(mode='local',seed='regression'){game.newGame({mode,seed});}
+function housedStart(){start();tile('house',12,5);tile('house',0,7,'bot');}
 function empty(){start();for(let r=0;r<game.SIZE;r++)for(let c=0;c<game.SIZE;c++)game.S.grid[r][c]=null;}
 function tile(type,r,c,owner='you',extra={}){game.S.grid[r][c]={type,owner,v:0,mask:0,root:`${r},${c}`,...extra};}
 function town(owner='you'){return game.calculateTown(owner);}
@@ -28,21 +29,31 @@ test('first load requires setup and exposes no playable actions',()=>{
   assert.equal(game.S.started,false);assert.equal(game.humanTurn(),false);
   assert.equal(game.document.getElementById('setup').open,true);
 });
-test('13×13 shared board starts with opposing roads, Houses, 4 capacity and zero population',()=>{
+test('13×13 shared board starts with only opposing T-intersections and all town values zero',()=>{
   start();assert.equal(game.SIZE,13);assert.equal(game.cellEls.length,169);
   assert.equal(game.at(12,6).mask,game.N|game.E|game.Wd);
   assert.equal(game.at(0,6).mask,game.Sd|game.E|game.Wd);
-  assert.equal(game.at(12,5).type,'house');assert.equal(game.at(0,7).type,'house');
+  assert.equal(game.at(12,5),null);assert.equal(game.at(0,7),null);
+  assert.equal(game.S.grid.flat().filter(Boolean).length,2);
   for(const owner of ['you','bot']){
-    assert.equal(town(owner).accommodation,4);assert.equal(town(owner).attraction,0);assert.equal(town(owner).population,0);
+    assert.equal(town(owner).accommodation,0);assert.equal(town(owner).attraction,0);assert.equal(town(owner).population,0);
     assert.deepEqual(Array.from(game.S[owner].civics,t=>t.type),['school','hospital','sports']);
   }
 });
-test('five-tile market and shared supply contain roads but no civics or upgrades',()=>{
-  start();assert.equal(game.S.market.length,5);
-  const supply=[...game.S.market,...game.S.deck];assert.equal(supply.length,128);
-  assert.equal(supply.filter(t=>t.type==='road').length,60);
+test('three-building market excludes roads and civics; separate stack contains only roads',()=>{
+  start();assert.equal(game.S.market.length,3);
+  const supply=[...game.S.market,...game.S.deck];assert.equal(supply.length,68);
+  assert.equal(supply.filter(t=>t.type==='road').length,0);
+  assert.equal(game.S.roads.length,60);assert.ok(game.S.roads.every(t=>t.type==='road'));
+  assert.equal(game.choices('you').filter(c=>c.source==='road').length,1);
   assert.ok(supply.every(t=>!['school','sports','hospital','upgrade'].includes(t.type)));
+});
+test('road placement consumes only the separate stack and reveals its next tile',()=>{
+  start();const before=game.S.roads.length;const choice=game.choices('you').find(c=>c.source==='road');
+  let placement=null;game.eachPlacement('you',choice.item,(item,r,c)=>{placement={item,r,c};return false;});
+  assert.ok(placement,'the face-up road should have a legal starting placement');
+  assert.equal(game.commitPlacement({source:'road',index:choice.index,item:placement.item},placement.r,placement.c),true);
+  assert.equal(game.S.roads.length,before-1);assert.equal(game.S.market.length,3);assert.equal(game.S.turn,'bot');
 });
 test('board sizing emits a valid CSS length in both preserved art styles',()=>{
   start();
@@ -53,9 +64,9 @@ test('board sizing emits a valid CSS length in both preserved art styles',()=>{
   }
 });
 test('same seed reproduces supply and variants, another seed changes it',()=>{
-  start('local','seed-A');const first=JSON.stringify({deck:game.S.deck,land:game.S.land,market:game.S.market});
-  start('local','seed-A');assert.equal(JSON.stringify({deck:game.S.deck,land:game.S.land,market:game.S.market}),first);
-  start('local','seed-B');assert.notEqual(JSON.stringify({deck:game.S.deck,land:game.S.land,market:game.S.market}),first);
+  start('local','seed-A');const first=JSON.stringify({deck:game.S.deck,roads:game.S.roads,land:game.S.land,market:game.S.market});
+  start('local','seed-A');assert.equal(JSON.stringify({deck:game.S.deck,roads:game.S.roads,land:game.S.land,market:game.S.market}),first);
+  start('local','seed-B');assert.notEqual(JSON.stringify({deck:game.S.deck,roads:game.S.roads,land:game.S.land,market:game.S.market}),first);
 });
 test('House has capacity only; Population is bounded by both totals',()=>{
   empty();tile('house',6,6);assert.equal(town().accommodation,4);assert.equal(town().population,0);
@@ -159,7 +170,8 @@ test('buildings require an own edge-adjacent road and empty in-bounds footprint'
   assert.equal(game.legalFor(house,11,6,'you'),true);
   assert.equal(game.legalFor(house,11,5,'you'),false);
   assert.equal(game.legalFor(house,1,6,'you'),false);
-  assert.equal(game.legalFor(house,12,5,'you'),false);
+  assert.equal(game.legalFor(house,12,5,'you'),true);
+  assert.equal(game.legalFor(house,12,6,'you'),false);
   assert.equal(game.legalFor({type:'sports'},11,7,'you'),true);
   assert.equal(game.legalFor({type:'sports'},12,7,'you'),false);
   assert.equal(game.legalFor({type:'upgrade'},12,5,'you'),false);
@@ -194,12 +206,12 @@ test('Civic placement consumes only its personal tile and leaves market/deck int
   assert.equal(game.S.you.civics.length,2);assert.equal(game.S.bot.civics.length,3);
   assert.equal(game.S.you.civics.some(t=>t.type==='school'),false);
   assert.equal(JSON.stringify([game.S.market,game.S.deck]),supply);
-  assert.equal(town().breakdown.school,2);
+  assert.equal(town().breakdown.school,0);
 });
 test('Sports occupies four squares but is consumed once',()=>{
   start();move('sports',11,7,'civic');
   for(const [r,c] of [[11,7],[11,8],[12,7],[12,8]])assert.equal(game.at(r,c).type,'sports');
-  assert.equal(game.S.you.civics.length,2);assert.equal(town().breakdown.sports,2);
+  assert.equal(game.S.you.civics.length,2);assert.equal(town().breakdown.sports,0);
 });
 test('invalid moves and double use of a Civic do not mutate state',()=>{
   start();const snapshot=JSON.stringify(game.S);
@@ -208,27 +220,27 @@ test('invalid moves and double use of a Civic do not mutate state',()=>{
   assert.equal(game.commitPlacement({source:'market',index:0,item:{type:'upgrade'}},12,5),false);
 });
 test('Player 1 reaching target gives Player 2 a full final turn, allowing a draw',()=>{
-  start();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
+  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
   assert.equal(game.S.finalTurn,true);assert.equal(game.S.over,false);assert.equal(game.S.turn,'bot');
   move('shop',1,6);assert.equal(game.S.over,true);assert.equal(game.S.result.winner,null);
   assert.equal(game.S.you.turns,game.S.bot.turns);
 });
 test('Player 2 can win on the reply with higher Population',()=>{
-  start();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('school',1,6,'civic');
+  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('school',1,6,'civic');
   assert.equal(game.S.result.winner,'bot');assert.equal(town('bot').population,2);
 });
 test('Player 2 reaching target first ends immediately after equal turns',()=>{
-  start();game.GAME_CONFIG.winPopulation=2;move('house',11,6);move('school',1,6,'civic');
+  housedStart();game.GAME_CONFIG.winPopulation=2;move('house',11,6);move('school',1,6,'civic');
   assert.equal(game.S.over,true);assert.equal(game.S.finalTurn,false);assert.equal(game.S.result.winner,'bot');
   assert.equal(game.S.you.turns,1);assert.equal(game.S.bot.turns,1);
 });
 test('Player 1 wins when final reply does not catch up',()=>{
-  start();game.GAME_CONFIG.winPopulation=2;move('school',11,6,'civic');move('shop',1,6);
+  housedStart();game.GAME_CONFIG.winPopulation=2;move('school',11,6,'civic');move('shop',1,6);
   assert.equal(game.S.result.winner,'you');
 });
 test('a blocked Player 2 can pass the final turn and equalise turn counts',()=>{
-  start();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
-  game.S.bot.civics=[];game.S.market=[];assert.equal(game.canPass('bot'),true);
+  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
+  game.S.bot.civics=[];game.S.market=[];game.S.roads=[];assert.equal(game.canPass('bot'),true);
   assert.equal(game.passTurn(),true);assert.equal(game.S.over,true);assert.equal(game.S.result.winner,'you');
   assert.equal(game.S.you.turns,game.S.bot.turns);
 });
@@ -241,12 +253,12 @@ test('blocked shared market cannot cause endless passing even with unseen tiles 
   game.passTurn();assert.equal(game.S.over,true);assert.equal(game.S.result.reason,'blocked');
 });
 test('Undo restores market, civic supply, hospital locks, population and final-turn state',()=>{
-  start();game.GAME_CONFIG.winPopulation=2;const before=JSON.stringify(game.S);move('school',11,6,'civic');
+  housedStart();game.GAME_CONFIG.winPopulation=2;const before=JSON.stringify(game.S);move('school',11,6,'civic');
   assert.equal(game.S.finalTurn,true);game.undoMove();assert.equal(JSON.stringify(game.S),before);
   move('hospital',11,6,'civic');assert.equal(game.at(11,6).lockedAttraction,0);game.undoMove();assert.equal(JSON.stringify(game.S),before);
 });
 test('Undo works after a finished game',()=>{
-  start();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('shop',1,6);
+  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('shop',1,6);
   assert.equal(game.S.over,true);game.undoMove();assert.equal(game.S.over,false);assert.equal(game.S.finalTurn,true);
   assert.equal(game.S.turn,'bot');assert.equal(game.document.getElementById('over').open,false);
 });

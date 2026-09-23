@@ -297,6 +297,8 @@
         </div>
         <div class="rowlabel" id="marketcount">Shared market</div>
         <div class="tilerow" id="market"></div>
+        <div class="rowlabel" id="roadcount">Road stack</div>
+        <div class="tilerow" id="roadrow"></div>
         <div class="rowlabel" id="civiclabel">Unused Civic Tiles</div>
         <div class="tilerow" id="civics"></div>
         <p id="hospitalhint" class="hint"></p>
@@ -1141,7 +1143,7 @@ function sprite(type,mask,variant,whole){
 
 /* ===================== balance configuration ===================== */
 var GAME_CONFIG={
-  boardSize:13, marketSize:5, winPopulation:40,
+  boardSize:13, marketSize:3, winPopulation:40,
   distanceMetric:"manhattan", // "chebyshev" restores the older square ranges.
   houseAccommodation:4, apartmentAccommodation:8, parkAttraction:1,
   shops:{one:1,two:4,threePlus:8},
@@ -1335,6 +1337,10 @@ function makeItem(type,mask){return {type:type,mask:mask||0,v:Math.floor(random(
 function buildDeck(){
   var deck=[];
   Object.keys(GAME_CONFIG.normalTiles).forEach(function(type){for(var i=0;i<GAME_CONFIG.normalTiles[type];i++)deck.push(makeItem(type));});
+  return shuffle(deck);
+}
+function buildRoadStack(){
+  var deck=[];
   Object.keys(GAME_CONFIG.roadTiles).forEach(function(mask){for(var i=0;i<GAME_CONFIG.roadTiles[mask];i++)deck.push(makeItem("road",Number(mask)));});
   return shuffle(deck);
 }
@@ -1348,7 +1354,7 @@ function newGame(options){
   SIZE=GAME_CONFIG.boardSize;
   var seed=String(options.seed||Date.now());
   S={grid:[],land:[],seed:seed,rng:seedNumber(seed),mode:options.mode==="local"?"local":"bot",you:newPlayer("you"),bot:newPlayer("bot"),
-    turn:"you",market:[],deck:[],selected:null,preview:null,inspect:null,fresh:null,finalTurn:false,over:false,started:true,paused:false,result:null};
+    turn:"you",market:[],deck:[],roads:[],selected:null,preview:null,inspect:null,fresh:null,finalTurn:false,over:false,started:true,paused:false,result:null};
   for(var r=0;r<SIZE;r++){
     S.grid.push(new Array(SIZE).fill(null));
     var row=[];for(var c=0;c<SIZE;c++)row.push(Math.floor(random()*12));S.land.push(row);
@@ -1356,15 +1362,15 @@ function newGame(options){
   var mid=Math.floor(SIZE/2);
   S.grid[SIZE-1][mid]={type:"entrance",mask:N|E|Wd,owner:"you",v:0,root:(SIZE-1)+","+mid};
   S.grid[0][mid]={type:"entrance",mask:Sd|E|Wd,owner:"bot",v:0,root:"0,"+mid};
-  putTile("you",{type:"house",v:0},SIZE-1,mid-1);
-  putTile("bot",{type:"house",v:1},0,mid+1);
-  S.deck=buildDeck();refill();cellEls=null;
+  S.deck=buildDeck();S.roads=buildRoadStack();refill();cellEls=null;
   document.getElementById("setup").close();document.getElementById("over").close();
   document.getElementById("board").style.setProperty("--mapsize",SIZE);
   renderLegend();render();
 }
 function choices(owner){
-  return S.market.map(function(item,index){return {source:"market",index:index,item:item};}).concat(S[owner].civics.map(function(item,index){return {source:"civic",index:index,item:item};}));
+  var options=S.market.map(function(item,index){return {source:"market",index:index,item:item};}).concat(S[owner].civics.map(function(item,index){return {source:"civic",index:index,item:item};}));
+  if(S.roads.length)options.push({source:"road",index:S.roads.length-1,item:S.roads[S.roads.length-1]});
+  return options;
 }
 function eachPlacement(owner,item,visit){
   var masks=item.type==="road"?roadRotations(item.mask):[item.mask||0];
@@ -1380,7 +1386,8 @@ function hasLegalChoice(owner){
 function canPass(owner){return !hasLegalChoice(owner);}
 function selectTile(source,index){
   if(!humanTurn())return;
-  var list=source==="market"?S.market:activePlayer().civics;
+  if(source==="road"&&index!==S.roads.length-1)return;
+  var list=source==="market"?S.market:source==="road"?S.roads:source==="civic"?activePlayer().civics:[];
   if(!list[index])return;
   S.selected={source:source,index:index,item:clone(list[index])};S.preview=null;S.inspect=null;render();
 }
@@ -1393,12 +1400,13 @@ function stagePlacement(r,c){
 function saveTurn(){var state=clone(S);state.selected=null;state.preview=null;state.inspect=null;moveHistory.push(state);}
 function commitPlacement(choice,r,c){
   if(!S.started||S.paused||S.over||!choice)return false;
-  var owner=S.turn,list=choice.source==="market"?S.market:choice.source==="civic"?S[owner].civics:[];
+  if(choice.source==="road"&&choice.index!==S.roads.length-1)return false;
+  var owner=S.turn,list=choice.source==="market"?S.market:choice.source==="road"?S.roads:choice.source==="civic"?S[owner].civics:[];
   var actual=list[choice.index];
   if(!actual||actual.type!==choice.item.type||!legalFor(choice.item,r,c,owner))return false;
   if(actual.type==="road"&&roadRotations(actual.mask).indexOf(choice.item.mask)<0)return false;
   saveTurn();putTile(owner,choice.item,r,c);
-  if(choice.source==="market")refill(choice.index);else list.splice(choice.index,1);
+  if(choice.source==="market")refill(choice.index);else if(choice.source==="road")S.roads.pop();else list.splice(choice.index,1);
   S.fresh={r:r,c:c};S.selected=null;S.preview=null;S.inspect=null;
   completeTurn(owner);return true;
 }
@@ -1575,8 +1583,12 @@ function render(){
   document.getElementById("winrule").textContent="Target: "+GAME_CONFIG.winPopulation+" Population";
   var market=document.getElementById("market");market.innerHTML="";
   S.market.forEach(function(it,i){market.appendChild(makeTileButton({source:"market",index:i,item:it},owner));});
-  if(!S.market.length)market.textContent="Normal tile supply exhausted.";
-  document.getElementById("marketcount").textContent="Shared market · "+S.deck.length+" tiles left in supply";
+  if(!S.market.length)market.textContent="Building supply exhausted.";
+  document.getElementById("marketcount").textContent="Building market · "+S.deck.length+" buildings left in supply";
+  var roads=document.getElementById("roadrow");roads.innerHTML="";
+  if(S.roads.length)roads.appendChild(makeTileButton({source:"road",index:S.roads.length-1,item:S.roads[S.roads.length-1]},owner));
+  else roads.textContent="Road stack exhausted.";
+  document.getElementById("roadcount").textContent="Road stack · "+S.roads.length+" left · top tile only";
   var civics=document.getElementById("civics");civics.innerHTML="";
   S[owner].civics.forEach(function(it,i){civics.appendChild(makeTileButton({source:"civic",index:i,item:it},owner));});
   if(!S[owner].civics.length)civics.textContent="All three Civic Tiles have been used.";
@@ -1589,7 +1601,7 @@ function render(){
   else if(!humanTurn())msg="Ada is choosing a tile…";
   else if(mayPass)msg=playerName(owner)+": no legal tiles available. Pass your turn.";
   else if(item)msg=playerName(owner)+": "+(S.preview?"Review the preview, then Confirm placement.":"Select a marked plot to preview "+NAMES[item.type]+".");
-  else msg=playerName(owner)+": choose one market tile or an unused Civic Tile.";
+  else msg=playerName(owner)+": choose a building, the face-up road, or an unused Civic Tile.";
   if(S.finalTurn&&!S.over)msg="Final turn for "+playerName("bot")+" — Player 1 reached the target. "+msg;
   document.getElementById("status").textContent=msg;
   var info="";
@@ -1615,7 +1627,7 @@ function render(){
 function showResults(){
   if(!S.over||!S.result)return;
   document.getElementById("overtitle").textContent=S.result.winner?playerName(S.result.winner)+" wins":"Draw";
-  document.getElementById("overbody").innerHTML='<p>'+(S.result.reason==="target"?"Both players have had equal turns. Highest Population wins.":"Neither player can place an available market or Civic Tile. Highest Population wins.")+'</p><h3>'+playerName("you")+'</h3>'+statLines(calculateTown("you"))+'<h3>'+playerName("bot")+'</h3>'+statLines(calculateTown("bot"));
+  document.getElementById("overbody").innerHTML='<p>'+(S.result.reason==="target"?"Both players have had equal turns. Highest Population wins.":"Neither player can place an available building, face-up road or Civic Tile. Highest Population wins.")+'</p><h3>'+playerName("you")+'</h3>'+statLines(calculateTown("you"))+'<h3>'+playerName("bot")+'</h3>'+statLines(calculateTown("bot"));
   var d=document.getElementById("over");if(!d.open)d.showModal();
 }
 function renderLegend(){
@@ -1624,7 +1636,7 @@ function renderLegend(){
     var art=sprite(type,type==="road"?7:0,0,true);
     if(type==="apartment")art=art.replace('<svg class="pixel-sprite"','<svg class="pixel-sprite tall"');
     return '<div>'+art+'<span><b>'+NAMES[type]+'</b><br>'+ruleText(type)+'</span></div>';
-  }).join("")+'<p>One tile per turn. Select, preview, confirm. You may pass only when no available tile fits. If neither player can place, highest Population wins.</p>';
+  }).join("")+'<p>Three buildings in the market; roads have their own stack with one showing. Start with only a T-intersection each. One tile per turn. Select, preview, confirm. You may pass only when no available tile fits. If neither player can place, highest Population wins.</p>';
 }
 function setArtStyle(style){
   if(style!=="pixel"&&style!=="illustrated")return;
@@ -1646,7 +1658,7 @@ function showSetup(){
   clearTimeout(botTimer);botTimer=null;S.paused=true;document.getElementById("over").close();
   document.getElementById("playmode").value=S.mode;document.getElementById("gameseed").value=S.started?S.seed:"";
   document.getElementById("cancelsetup").hidden=!S.started;render();
-  document.getElementById("setupsummary").textContent=GAME_CONFIG.boardSize+" × "+GAME_CONFIG.boardSize+" shared board. Target: "+GAME_CONFIG.winPopulation+" Population. Each player starts with a House, a T-intersection and three personal Civic Tiles.";
+  document.getElementById("setupsummary").textContent=GAME_CONFIG.boardSize+" × "+GAME_CONFIG.boardSize+" shared board. Target: "+GAME_CONFIG.winPopulation+" Population. Each player starts with only a T-intersection on the board and three personal Civic Tiles. Choose from three face-up buildings or the top tile of the separate road stack.";
   document.getElementById("setup").showModal();
 }
 function closeSetup(){if(!S.started)return;document.getElementById("setup").close();S.paused=false;render();scheduleBot();}
