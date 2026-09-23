@@ -19,25 +19,26 @@ upgrades, money, tax or development purchases in the active game.
 | House | 4 | 0 |
 | Apartment | 8 if an own Park AND Shop touch its edges; otherwise 0 | 0 |
 | Park | 0 | 1 total if at least one own House touches an edge |
-| Shop | 0 | Each orthogonal group: 1 / 2 / 3+ Shops gives 1 / 4 / 8 total |
+| Shop | 0 | Each orthogonal group: 1 / 2 / 3+ Shops gives 0 / 4 / 8 total |
 | Industry | 0 | 4 if there is no own House within 2 spaces; otherwise 0 |
-| School | 0 | +3 per own House-equivalent within 3 spaces, −1 per own House-equivalent outside; Apartments count as two |
-| Hospital | 0 | floor(Population before placement / 2), capped at 12; permanently locked |
+| School | 0 | Locks at +3 per own House-equivalent within 3 spaces when placed; Apartments count as two |
+| Hospital | 0 | Rounds Attraction up to current Accommodation when placed, capped at 12; permanently locked |
 | Sports Ground | 0 | 2 per distinct own building type within 2 spaces, capped at 12 |
 | Road | 0 | 0 |
 
 Ranges use **Manhattan distance** (orthogonal grid steps). Adjacency and Shop
 connections require shared edges, never diagonals. Apartments are a separate
 building type: they do not count as Houses for Parks or Industry. For School
-scoring, each Apartment counts as two House-equivalents.
+scoring, each Apartment counts as two House-equivalents at placement.
 Sports Ground retains the existing **2×2 footprint**; distance is measured from
 its nearest occupied square. It counts each building type once, including
 inactive Apartments, but excludes roads, opponents and itself. Its four pieces
 are one building and never multiply its Attraction.
 
-Every effect is recalculated from the board. Hospital is the sole exception:
-its contribution is captured as `lockedAttraction` on placement, using Population
-before it adds any Attraction or changes the Sports Ground's diversity bonus.
+Every effect is recalculated from the board. School and Hospital are the
+exceptions: each contribution is captured as `lockedAttraction` on placement.
+School uses House-equivalents in range; Hospital fills the gap up to current
+Accommodation, capped at 12.
 
 ## Setup and turn sequence
 

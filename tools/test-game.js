@@ -101,15 +101,15 @@ test('Park is +1 total regardless of House count, and ignores Apartments and opp
   tile('house',6,7);assert.equal(town().breakdown.parks,1);tile('house',7,6);assert.equal(town().breakdown.parks,1);
   game.S.grid[6][7]=null;game.S.grid[7][6]=null;tile('house',7,7);assert.equal(town().breakdown.parks,0);
 });
-test('Shops score 1 / 4 / 8 / 8 per connected group',()=>{
-  empty();[1,4,8,8].forEach((expected,i)=>{tile('shop',6,i+3);assert.equal(town().breakdown.shops,expected);});
+test('Shops score 0 / 4 / 8 / 8 per connected group',()=>{
+  empty();[0,4,8,8].forEach((expected,i)=>{tile('shop',6,i+3);assert.equal(town().breakdown.shops,expected);});
 });
 test('separate Shop groups score independently, merge once, and ignore diagonal/opponent links',()=>{
   empty();tile('shop',5,2);tile('shop',5,3);tile('shop',5,5);tile('shop',5,6);
   assert.equal(town().breakdown.shops,8);assert.equal(town().shopGroups.length,2);
   tile('shop',5,4);assert.equal(town().breakdown.shops,8);assert.equal(town().shopGroups.length,1);
-  tile('shop',6,7);assert.equal(town().breakdown.shops,9);
-  tile('shop',5,7,'bot');assert.equal(town().breakdown.shops,9);assert.equal(town('bot').breakdown.shops,1);
+  tile('shop',6,7);assert.equal(town().breakdown.shops,8);
+  tile('shop',5,7,'bot');assert.equal(town().breakdown.shops,8);assert.equal(town('bot').breakdown.shops,0);
 });
 test('Industry excludes only own Houses at Manhattan distance <=2',()=>{
   empty();tile('industrial',6,6);assert.equal(town().breakdown.industry,4);
@@ -123,29 +123,28 @@ test('distance convention is configurable in one place',()=>{
   game.GAME_CONFIG.distanceMetric='chebyshev';assert.equal(game.gridDistance(0,0,2,2),2);
   tile('industrial',0,0);tile('house',2,2);assert.equal(town().breakdown.industry,0);
 });
-test('School rewards House-equivalents in its catchment and penalises those outside it',()=>{
-  empty();tile('school',0,0);tile('house',0,3);tile('house',1,2);tile('house',2,2);tile('house',1,0,'bot');tile('apartment',2,0);
-  assert.equal(town().breakdown.school,11);tile('industrial',0,1);assert.equal(town().breakdown.school,11);
-  tile('apartment',4,0);assert.equal(town().breakdown.school,9);
+test('School locks +3 per House-equivalent in its catchment at placement',()=>{
+  empty();tile('house',0,3);tile('house',1,2);tile('house',2,2);tile('house',1,0,'bot');tile('apartment',2,0);game.putTile('you',{type:'school'},0,0);
+  assert.equal(town().breakdown.school,12);tile('industrial',0,1);assert.equal(town().breakdown.school,12);
+  tile('apartment',4,0);assert.equal(town().breakdown.school,12);
   tile('house',3,0);assert.equal(town().breakdown.school,12);
 });
 test('School has no Attraction cap; overlapping civic ranges calculate independently',()=>{
-  empty();tile('school',6,6);
-  for(const [r,c] of [[6,3],[6,4],[6,5],[6,7],[6,8],[6,9],[5,6]])tile('house',r,c);
+  empty();for(const [r,c] of [[6,3],[6,4],[6,5],[6,7],[6,8],[6,9],[5,6]])tile('house',r,c);game.putTile('you',{type:'school'},6,6);
   assert.equal(town().breakdown.school,21);
   game.putTile('you',{type:'sports'},3,5);
   assert.equal(town().breakdown.school,21);assert.equal(town().breakdown.sports,4);
 });
-test('Hospital uses pre-placement Population, rounds down, caps and never grows later',()=>{
+test('Hospital fills Attraction to current Accommodation, rounds up and stays locked',()=>{
   empty();for(let c=0;c<3;c++)tile('house',12,c);
   for(let c=0;c<3;c++)tile('shop',0,c);tile('shop',0,6);
-  assert.equal(town().population,9);
+  assert.equal(town().population,8);
   game.putTile('you',{type:'hospital'},6,6);assert.equal(game.at(6,6).lockedAttraction,4);
   assert.equal(town().breakdown.hospital,4);
   for(let c=3;c<8;c++)tile('house',12,c);
   for(let c=0;c<3;c++)tile('shop',2,c);
   assert.equal(town().breakdown.hospital,4);
-  assert.equal(game.hospitalValue(24),12);assert.equal(game.hospitalValue(30),12);
+  assert.equal(game.hospitalValue(5),3);assert.equal(game.hospitalValue(24),12);assert.equal(game.hospitalValue(30),12);
   assert.equal(game.hospitalValue(0),0);
 });
 test('Sports counts unique own building types, ignores roads/opponents/self and caps at 12',()=>{
@@ -163,7 +162,7 @@ test('Sports range uses nearest footprint square and works at board edges',()=>{
   tile('shop',3,2);assert.equal(town().breakdown.sports,2);
 });
 test('all scoring effects isolate ownership',()=>{
-  empty();tile('school',6,6);tile('industrial',4,4);tile('park',5,5);tile('apartment',5,4);
+  empty();tile('industrial',4,4);tile('park',5,5);tile('apartment',5,4);game.putTile('you',{type:'school'},6,6);
   tile('house',5,6,'bot');tile('park',5,3,'bot');tile('shop',4,4,'bot');
   assert.equal(town().accommodation,0);assert.equal(town().breakdown.school,6);assert.equal(town().breakdown.parks,0);
 });
@@ -192,19 +191,18 @@ test('buildings require an own edge-adjacent road and empty in-bounds footprint'
   assert.equal(game.legalFor({type:'sports'},12,7,'you'),false);
   assert.equal(game.legalFor({type:'upgrade'},12,5,'you'),false);
 });
-test('preview shows House disabling Industry and entering School range without mutating the board',()=>{
-  empty();tile('road',6,6,'you',{mask:15});tile('industrial',6,9);tile('school',4,7);
-  const snapshot=JSON.stringify(game.S),p=game.previewPlacement('you',{type:'house'},6,7);
-  assert.equal(p.before.accommodation,0);assert.equal(p.after.accommodation,4);
-  assert.equal(p.before.attraction,4);assert.equal(p.after.attraction,3);
-  assert.ok(p.changes.some(c=>c.type==='industrial'&&c.from===4&&c.to===0));
-  assert.ok(p.changes.some(c=>c.type==='school'&&c.from===0&&c.to===3));
+test('School preview locks placement-time Attraction without mutating the board',()=>{
+  empty();tile('road',6,6,'you',{mask:15});tile('house',6,5);tile('industrial',6,9);
+  const snapshot=JSON.stringify(game.S),p=game.previewPlacement('you',{type:'school'},6,7);
+  assert.equal(p.before.accommodation,4);assert.equal(p.after.accommodation,4);
+  assert.equal(p.before.attraction,4);assert.equal(p.after.attraction,7);
+  assert.equal(p.after.breakdown.school,3);
   assert.equal(JSON.stringify(game.S),snapshot);
 });
 test('Hospital preview agrees with the committed lock and leaves no phantom tiles',()=>{
   empty();tile('road',6,6,'you',{mask:15});tile('house',0,0);tile('shop',1,0);tile('shop',1,1);
-  const p=game.previewPlacement('you',{type:'hospital'},6,7);assert.equal(p.after.breakdown.hospital,2);assert.equal(game.at(6,7),null);
-  game.putTile('you',{type:'hospital'},6,7);assert.equal(game.at(6,7).lockedAttraction,2);
+  const p=game.previewPlacement('you',{type:'hospital'},6,7);assert.equal(p.after.breakdown.hospital,0);assert.equal(game.at(6,7),null);
+  game.putTile('you',{type:'hospital'},6,7);assert.equal(game.at(6,7).lockedAttraction,0);
 });
 test('selection and staging consume nothing; confirmation places once, refills same market slot and ends turn',()=>{
   start();select('shop');const deck=game.S.deck.length,slot=game.S.deck[deck-1];
@@ -236,9 +234,9 @@ test('invalid moves and double use of a Civic do not mutate state',()=>{
   assert.equal(game.commitPlacement({source:'market',index:0,item:{type:'upgrade'}},12,5),false);
 });
 test('Player 1 reaching target gives Player 2 a full final turn, allowing a draw',()=>{
-  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
+  housedStart();game.GAME_CONFIG.winPopulation=3;move('school',11,6,'civic');
   assert.equal(game.S.finalTurn,true);assert.equal(game.S.over,false);assert.equal(game.S.turn,'bot');
-  move('shop',1,6);assert.equal(game.S.over,true);assert.equal(game.S.result.winner,null);
+  move('school',1,6,'civic');assert.equal(game.S.over,true);assert.equal(game.S.result.winner,null);
   assert.equal(game.S.you.turns,game.S.bot.turns);
 });
 test('Player 2 can win on the reply with higher Population',()=>{
@@ -255,7 +253,7 @@ test('Player 1 wins when final reply does not catch up',()=>{
   assert.equal(game.S.result.winner,'you');
 });
 test('a blocked Player 2 can pass the final turn and equalise turn counts',()=>{
-  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);
+  housedStart();game.GAME_CONFIG.winPopulation=3;move('school',11,6,'civic');
   game.S.bot.civics=[];game.S.market=[];game.S.roads=[];assert.equal(game.canPass('bot'),true);
   assert.equal(game.passTurn(),true);assert.equal(game.S.over,true);assert.equal(game.S.result.winner,'you');
   assert.equal(game.S.you.turns,game.S.bot.turns);
@@ -271,10 +269,10 @@ test('blocked shared market cannot cause endless passing even with unseen tiles 
 test('Undo restores market, civic supply, hospital locks, population and final-turn state',()=>{
   housedStart();game.GAME_CONFIG.winPopulation=2;const before=JSON.stringify(game.S);move('school',11,6,'civic');
   assert.equal(game.S.finalTurn,true);game.undoMove();assert.equal(JSON.stringify(game.S),before);
-  move('hospital',11,6,'civic');assert.equal(game.at(11,6).lockedAttraction,0);game.undoMove();assert.equal(JSON.stringify(game.S),before);
+  move('hospital',11,6,'civic');assert.equal(game.at(11,6).lockedAttraction,4);game.undoMove();assert.equal(JSON.stringify(game.S),before);
 });
 test('Undo works after a finished game',()=>{
-  housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('shop',1,6);
+  housedStart();game.GAME_CONFIG.winPopulation=3;move('school',11,6,'civic');move('school',1,6,'civic');
   assert.equal(game.S.over,true);game.undoMove();assert.equal(game.S.over,false);assert.equal(game.S.finalTurn,true);
   assert.equal(game.S.turn,'bot');assert.equal(game.document.getElementById('over').open,false);
 });

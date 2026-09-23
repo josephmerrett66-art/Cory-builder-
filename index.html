@@ -1148,9 +1148,9 @@ var GAME_CONFIG={
   boardSize:13, marketSize:3, winPopulation:40,
   distanceMetric:"manhattan", // "chebyshev" restores the older square ranges.
   houseAccommodation:4, apartmentAccommodation:8, parkAttraction:1,
-  shops:{one:1,two:4,threePlus:8},
+  shops:{one:0,two:4,threePlus:8},
   industryAttraction:4, industryHouseRange:2,
-  schoolAttractionPerHouse:3, schoolOutsideHousePenalty:1, schoolRange:3,
+  schoolAttractionPerHouse:3, schoolRange:3,
   hospitalPopulationDivisor:2, hospitalMaxAttraction:12,
   sportsAttractionPerType:2, sportsRange:2, sportsMaxAttraction:12,
   sportsFootprint:2, // Preserve the existing four-part Sports Ground artwork.
@@ -1226,9 +1226,19 @@ function legalFor(item,r,c,owner){
   var cells=cellsFor(item.type,r,c);
   return cells.every(function(p){return at(p[0],p[1])===null;})&&cells.some(function(p){return legalBuilding(p[0],p[1],owner);});
 }
-function hospitalValue(population){return Math.min(GAME_CONFIG.hospitalMaxAttraction,Math.floor(population/GAME_CONFIG.hospitalPopulationDivisor));}
+function hospitalValue(town){
+  if(typeof town==="number")return Math.min(GAME_CONFIG.hospitalMaxAttraction,Math.ceil(town/GAME_CONFIG.hospitalPopulationDivisor));
+  return Math.min(GAME_CONFIG.hospitalMaxAttraction,Math.max(0,town.accommodation-town.attraction));
+}
+function schoolValue(owner,r,c){
+  var units=townTiles(owner).filter(function(t){return t.type==="house"||t.type==="apartment";}).reduce(function(total,t){
+    if(gridDistance(t.r,t.c,r,c)>GAME_CONFIG.schoolRange)return total;
+    return total+(t.type==="apartment"?2:1);
+  },0);
+  return units*GAME_CONFIG.schoolAttractionPerHouse;
+}
 function putTile(owner,item,r,c){
-  var locked=item.type==="hospital"?hospitalValue(calculateTown(owner).population):null;
+  var town=calculateTown(owner),locked=item.type==="hospital"?hospitalValue(town):item.type==="school"?schoolValue(owner,r,c):null;
   cellsFor(item.type,r,c).forEach(function(p){
     var q={type:item.type,owner:owner,mask:item.mask||0,v:item.type==="sports"?p[2]:(item.v||0),root:r+","+c};
     if(locked!==null)q.lockedAttraction=locked;
@@ -1292,12 +1302,8 @@ function calculateIndustryAttraction(owner,tiles,effects){
 function calculateSchoolAttraction(owner,tiles,effects){
   var homes=tiles.filter(function(t){return t.type==="house"||t.type==="apartment";});
   return tiles.filter(function(t){return t.type==="school";}).reduce(function(total,t){
-    var inside=homes.filter(function(h){return gridDistance(t.r,t.c,h.r,h.c)<=GAME_CONFIG.schoolRange;});
-    var units=function(home){return home.type==="apartment"?2:1;};
-    var count=inside.reduce(function(n,h){return n+units(h);},0);
-    var outside=homes.filter(function(h){return inside.indexOf(h)<0;}).reduce(function(n,h){return n+units(h);},0);
-    var value=count*GAME_CONFIG.schoolAttractionPerHouse-outside*GAME_CONFIG.schoolOutsideHousePenalty;
-    return total+effect(effects,t,value,"Attraction",count+" House-equivalents in catchment, "+outside+" outside");
+    var value=t.lockedAttraction||0;
+    return total+effect(effects,t,value,"Attraction","Locked when placed");
   },0);
 }
 function calculateHospitalAttraction(owner,tiles,effects){
@@ -1510,7 +1516,7 @@ function chooseBotMove(owner){
       if(item.type==="house")value+=1.5;
       if(item.type==="park"||item.type==="shop")value+=1;
       if(isCivic(item.type)&&after.population-before.population<3)value-=5;
-      if(item.type==="hospital")value-=Math.max(0,GAME_CONFIG.hospitalMaxAttraction-hospitalValue(before.population))*0.9;
+      if(item.type==="hospital")value-=Math.max(0,GAME_CONFIG.hospitalMaxAttraction-hospitalValue(before))*0.9;
       if(item.type==="sports")value-=3;
       if(ends===0)value-=24;
       if(after.population>=GAME_CONFIG.winPopulation)value+=500;
@@ -1553,14 +1559,14 @@ function ruleText(type,owner){
     park:"+"+g.parkAttraction+" Attraction TOTAL if adjacent to at least one of your Houses. Apartments do not activate Parks.",
     shop:"Connected groups: 1 Shop = +"+g.shops.one+", 2 = +"+g.shops.two+", 3+ = +"+g.shops.threePlus+" Attraction per group. Edges only.",
     industrial:"+"+g.industryAttraction+" Attraction if no House of yours is within "+g.industryHouseRange+" spaces. Otherwise 0.",
-    school:"+"+g.schoolAttractionPerHouse+" Attraction per House-equivalent within "+g.schoolRange+" spaces; Apartments count as two, and -"+g.schoolOutsideHousePenalty+" applies per House-equivalent outside the catchment.",
-    hospital:"Locks at half your current Population, rounded down, up to +"+g.hospitalMaxAttraction+" Attraction.",
+    school:"Locks at +"+g.schoolAttractionPerHouse+" per House-equivalent within "+g.schoolRange+" spaces when placed; Apartments count as two.",
+    hospital:"Rounds Attraction up to current Accommodation when placed, up to +"+g.hospitalMaxAttraction+" Attraction.",
     sports:"+"+g.sportsAttractionPerType+" Attraction per different building type of yours within "+g.sportsRange+" spaces of its footprint, up to +"+g.sportsMaxAttraction+". Occupies "+g.sportsFootprint+" × "+g.sportsFootprint+".",
     road:"Rotate to match every touching road edge. Must connect to your own network; opponent roads cannot provide access.",
     entrance:"Your starting T-intersection. Buildings must touch a road belonging to their own player."
   };
   var text=rules[type]||"";
-  if(type==="hospital"&&owner)text+=" Would currently provide +"+hospitalValue(calculateTown(owner).population)+" Attraction.";
+  if(type==="hospital"&&owner)text+=" Would currently provide +"+hospitalValue(calculateTown(owner))+" Attraction.";
   return text;
 }
 function contextualRanges(){
@@ -1636,7 +1642,7 @@ function renderPreview(){
   var h='<b>'+NAMES[S.selected.item.type]+' · row '+(p.r+1)+', column '+(p.c+1)+'</b><table><tr><th>Town</th><th>Now</th><th>After</th></tr>';
   ["accommodation","attraction","population"].forEach(function(k){h+='<tr><td>'+k.charAt(0).toUpperCase()+k.slice(1)+'</td><td>'+p.before[k]+'</td><td>'+p.after[k]+'</td></tr>';});
   h+='</table>';
-  if(S.selected.item.type==="hospital")h+='<p>Locks at +'+hospitalValue(p.before.population)+' Attraction.</p>';
+  if(S.selected.item.type==="hospital")h+='<p>Locks at +'+hospitalValue(p.before)+' Attraction.</p>';
   p.changes.forEach(function(change){h+='<p>'+NAMES[change.type]+' ('+change.key.split(",").map(function(n){return Number(n)+1;}).join(", ")+'): '+change.from+' → '+change.to+'. '+change.detail+'.</p>';});
   if(S.selected.item.type!=="road"){
     putTile(S.turn,S.selected.item,p.r,p.c);var ends=openEnds(S.turn);clearTile(S.selected.item.type,p.r,p.c);
@@ -1668,7 +1674,7 @@ function render(){
   S[owner].civics.forEach(function(it,i){civics.appendChild(makeTileButton({source:"civic",index:i,item:it},owner));});
   if(!S[owner].civics.length)civics.textContent="All three Civic Tiles have been used.";
   document.getElementById("civiclabel").textContent=playerName(owner)+" · unused Civic Tiles";
-  document.getElementById("hospitalhint").textContent=S[owner].civics.some(function(it){return it.type==="hospital";})?"Hospital would currently lock at +"+hospitalValue(calculateTown(owner).population)+" Attraction.":"";
+  document.getElementById("hospitalhint").textContent=S[owner].civics.some(function(it){return it.type==="hospital";})?"Hospital would currently lock at +"+hospitalValue(calculateTown(owner))+" Attraction.":"";
   var mayPass=canPass(owner),msg;
   if(!S.started)msg="Choose players and start a new town.";
   else if(S.over)msg="Game over. Inspect any building, view Results, or Undo.";
