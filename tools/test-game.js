@@ -116,10 +116,11 @@ test('distance convention is configurable in one place',()=>{
   game.GAME_CONFIG.distanceMetric='chebyshev';assert.equal(game.gridDistance(0,0,2,2),2);
   tile('industrial',0,0);tile('house',2,2);assert.equal(town().breakdown.industry,0);
 });
-test('School rewards Houses in its catchment and penalises Houses outside it',()=>{
+test('School rewards House-equivalents in its catchment and penalises those outside it',()=>{
   empty();tile('school',0,0);tile('house',0,3);tile('house',1,2);tile('house',2,2);tile('house',1,0,'bot');tile('apartment',2,0);
-  assert.equal(town().breakdown.school,5);tile('industrial',0,1);assert.equal(town().breakdown.school,5);
-  tile('house',3,0);assert.equal(town().breakdown.school,8);
+  assert.equal(town().breakdown.school,11);tile('industrial',0,1);assert.equal(town().breakdown.school,11);
+  tile('apartment',4,0);assert.equal(town().breakdown.school,9);
+  tile('house',3,0);assert.equal(town().breakdown.school,12);
 });
 test('School has no Attraction cap; overlapping civic ranges calculate independently',()=>{
   empty();tile('school',6,6);
@@ -157,7 +158,7 @@ test('Sports range uses nearest footprint square and works at board edges',()=>{
 test('all scoring effects isolate ownership',()=>{
   empty();tile('school',6,6);tile('industrial',4,4);tile('park',5,5);tile('apartment',5,4);
   tile('house',5,6,'bot');tile('park',5,3,'bot');tile('shop',4,4,'bot');
-  assert.equal(town().accommodation,0);assert.equal(town().breakdown.school,0);assert.equal(town().breakdown.parks,0);
+  assert.equal(town().accommodation,0);assert.equal(town().breakdown.school,6);assert.equal(town().breakdown.parks,0);
 });
 test('roads rotate and must connect to own network with matching edges',()=>{
   start();assert.equal(game.legalRoad(11,6,5,'you'),true);assert.equal(game.legalRoad(11,6,10,'you'),false);

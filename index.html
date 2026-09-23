@@ -1290,12 +1290,14 @@ function calculateIndustryAttraction(owner,tiles,effects){
   },0);
 }
 function calculateSchoolAttraction(owner,tiles,effects){
-  var houses=tiles.filter(function(t){return t.type==="house";});
+  var homes=tiles.filter(function(t){return t.type==="house"||t.type==="apartment";});
   return tiles.filter(function(t){return t.type==="school";}).reduce(function(total,t){
-    var count=houses.filter(function(h){return gridDistance(t.r,t.c,h.r,h.c)<=GAME_CONFIG.schoolRange;}).length;
-    var outside=houses.length-count;
+    var inside=homes.filter(function(h){return gridDistance(t.r,t.c,h.r,h.c)<=GAME_CONFIG.schoolRange;});
+    var units=function(home){return home.type==="apartment"?2:1;};
+    var count=inside.reduce(function(n,h){return n+units(h);},0);
+    var outside=homes.filter(function(h){return inside.indexOf(h)<0;}).reduce(function(n,h){return n+units(h);},0);
     var value=count*GAME_CONFIG.schoolAttractionPerHouse-outside*GAME_CONFIG.schoolOutsideHousePenalty;
-    return total+effect(effects,t,value,"Attraction",count+" Houses in catchment, "+outside+" outside");
+    return total+effect(effects,t,value,"Attraction",count+" House-equivalents in catchment, "+outside+" outside");
   },0);
 }
 function calculateHospitalAttraction(owner,tiles,effects){
@@ -1551,7 +1553,7 @@ function ruleText(type,owner){
     park:"+"+g.parkAttraction+" Attraction TOTAL if adjacent to at least one of your Houses. Apartments do not activate Parks.",
     shop:"Connected groups: 1 Shop = +"+g.shops.one+", 2 = +"+g.shops.two+", 3+ = +"+g.shops.threePlus+" Attraction per group. Edges only.",
     industrial:"+"+g.industryAttraction+" Attraction if no House of yours is within "+g.industryHouseRange+" spaces. Otherwise 0.",
-    school:"+"+g.schoolAttractionPerHouse+" Attraction per House within "+g.schoolRange+" spaces; -"+g.schoolOutsideHousePenalty+" for each of your Houses outside the catchment. Recalculates as your town grows.",
+    school:"+"+g.schoolAttractionPerHouse+" Attraction per House-equivalent within "+g.schoolRange+" spaces; Apartments count as two, and -"+g.schoolOutsideHousePenalty+" applies per House-equivalent outside the catchment.",
     hospital:"Locks at half your current Population, rounded down, up to +"+g.hospitalMaxAttraction+" Attraction.",
     sports:"+"+g.sportsAttractionPerType+" Attraction per different building type of yours within "+g.sportsRange+" spaces of its footprint, up to +"+g.sportsMaxAttraction+". Occupies "+g.sportsFootprint+" × "+g.sportsFootprint+".",
     road:"Rotate to match every touching road edge. Must connect to your own network; opponent roads cannot provide access.",
