@@ -1611,7 +1611,7 @@ function paintBoard(){
   });
 }
 function makeTileButton(choice,owner){
-  var item=choice.item,b=document.createElement("button");b.type="button";
+  var item=(choice.source==="hand"&&S.selected&&S.selected.source==="hand"&&S.selected.index===choice.index)?S.selected.item:choice.item,b=document.createElement("button");b.type="button";
   b.className="tile"+(item.type==="apartment"?" tall":"")+(S.selected&&S.selected.source===choice.source&&S.selected.index===choice.index?" sel":"");
   b.innerHTML=sprite(item.type,item.mask,item.v,true);
   var name=item.type==="road"?SHAPE_NAME[item.mask]+" road":NAMES[item.type];
