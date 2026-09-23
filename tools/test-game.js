@@ -116,17 +116,17 @@ test('distance convention is configurable in one place',()=>{
   game.GAME_CONFIG.distanceMetric='chebyshev';assert.equal(game.gridDistance(0,0,2,2),2);
   tile('industrial',0,0);tile('house',2,2);assert.equal(town().breakdown.industry,0);
 });
-test('School counts each own House within 3, including new Houses, without an old industry penalty',()=>{
+test('School rewards Houses in its catchment and penalises Houses outside it',()=>{
   empty();tile('school',0,0);tile('house',0,3);tile('house',1,2);tile('house',2,2);tile('house',1,0,'bot');tile('apartment',2,0);
-  assert.equal(town().breakdown.school,4);tile('industrial',0,1);assert.equal(town().breakdown.school,4);
-  tile('house',3,0);assert.equal(town().breakdown.school,6);
+  assert.equal(town().breakdown.school,5);tile('industrial',0,1);assert.equal(town().breakdown.school,5);
+  tile('house',3,0);assert.equal(town().breakdown.school,8);
 });
 test('School has no Attraction cap; overlapping civic ranges calculate independently',()=>{
   empty();tile('school',6,6);
   for(const [r,c] of [[6,3],[6,4],[6,5],[6,7],[6,8],[6,9],[5,6]])tile('house',r,c);
-  assert.equal(town().breakdown.school,14);
+  assert.equal(town().breakdown.school,21);
   game.putTile('you',{type:'sports'},3,5);
-  assert.equal(town().breakdown.school,14);assert.equal(town().breakdown.sports,4);
+  assert.equal(town().breakdown.school,21);assert.equal(town().breakdown.sports,4);
 });
 test('Hospital uses pre-placement Population, rounds down, caps and never grows later',()=>{
   empty();for(let c=0;c<3;c++)tile('house',12,c);
@@ -188,9 +188,9 @@ test('preview shows House disabling Industry and entering School range without m
   empty();tile('road',6,6,'you',{mask:15});tile('industrial',6,9);tile('school',4,7);
   const snapshot=JSON.stringify(game.S),p=game.previewPlacement('you',{type:'house'},6,7);
   assert.equal(p.before.accommodation,0);assert.equal(p.after.accommodation,4);
-  assert.equal(p.before.attraction,4);assert.equal(p.after.attraction,2);
+  assert.equal(p.before.attraction,4);assert.equal(p.after.attraction,3);
   assert.ok(p.changes.some(c=>c.type==='industrial'&&c.from===4&&c.to===0));
-  assert.ok(p.changes.some(c=>c.type==='school'&&c.from===0&&c.to===2));
+  assert.ok(p.changes.some(c=>c.type==='school'&&c.from===0&&c.to===3));
   assert.equal(JSON.stringify(game.S),snapshot);
 });
 test('Hospital preview agrees with the committed lock and leaves no phantom tiles',()=>{
@@ -235,7 +235,7 @@ test('Player 1 reaching target gives Player 2 a full final turn, allowing a draw
 });
 test('Player 2 can win on the reply with higher Population',()=>{
   housedStart();game.GAME_CONFIG.winPopulation=1;move('shop',11,6);move('school',1,6,'civic');
-  assert.equal(game.S.result.winner,'bot');assert.equal(town('bot').population,2);
+  assert.equal(game.S.result.winner,'bot');assert.equal(town('bot').population,3);
 });
 test('Player 2 reaching target first ends immediately after equal turns',()=>{
   housedStart();game.GAME_CONFIG.winPopulation=2;move('house',11,6);move('school',1,6,'civic');

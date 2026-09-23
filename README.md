@@ -21,7 +21,7 @@ upgrades, money, tax or development purchases in the active game.
 | Park | 0 | 1 total if at least one own House touches an edge |
 | Shop | 0 | Each orthogonal group: 1 / 2 / 3+ Shops gives 1 / 4 / 8 total |
 | Industry | 0 | 4 if there is no own House within 2 spaces; otherwise 0 |
-| School | 0 | 2 per own House within 3 spaces, uncapped |
+| School | 0 | +3 per own House within 3 spaces, −1 per own House outside the catchment |
 | Hospital | 0 | floor(Population before placement / 2), capped at 12; permanently locked |
 | Sports Ground | 0 | 2 per distinct own building type within 2 spaces, capped at 12 |
 | Road | 0 | 0 |
