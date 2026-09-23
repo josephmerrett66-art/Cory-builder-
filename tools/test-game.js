@@ -58,7 +58,7 @@ test('a turn is either two takes or two placements, never a mixed turn',()=>{
 });
 test('rotating a selected road updates its hand tile preview',()=>{
   start();game.S.mode='place';game.S.used=0;game.S.you.hand=[{type:'road',mask:3,v:0}];
-  game.S.selected={source:'hand',index:0,item:{type:'road',mask:3,v:0}};
+  game.selectTile('hand',0);assert.equal(game.S.mode,'place');assert.equal(game.document.getElementById('rotate').disabled,false);
   game.doRotate();assert.equal(game.S.selected.item.mask,6);
   const button=game.makeTileButton({source:'hand',index:0,item:game.S.you.hand[0]},'you');
   assert.equal(button.innerHTML,game.sprite('road',6,0,true));

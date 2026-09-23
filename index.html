@@ -1430,7 +1430,7 @@ function selectTile(source,index){
   if(!canPlace(S.turn))return;
   var list=activePlayer().hand;
   if(!list[index])return;
-  S.selected={source:source,index:index,item:clone(list[index])};S.preview=null;S.inspect=null;render();
+  S.mode="place";S.selected={source:source,index:index,item:clone(list[index])};S.preview=null;S.inspect=null;render();
 }
 function stagePlacement(r,c){
   if(!humanTurn()||!S.selected)return;
